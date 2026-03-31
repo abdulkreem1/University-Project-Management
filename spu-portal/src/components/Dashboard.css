@@ -1,0 +1,111 @@
+.dashboard {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 32px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+
+/* Welcome banner */
+.welcome-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: linear-gradient(135deg, #1a3a5c, #0d2137);
+  color: #fff;
+  border-radius: 14px;
+  padding: 28px 32px;
+  border-left: 6px solid #c8a84b;
+  box-shadow: 0 4px 20px rgba(26,58,92,.25);
+}
+
+.welcome-banner h1 {
+  font-size: 24px;
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+
+.welcome-banner p {
+  font-size: 14px;
+  opacity: .75;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+}
+
+.welcome-badge { font-size: 52px; }
+
+/* Grid */
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 18px;
+}
+
+.dash-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  background: #fff;
+  border: none;
+  border-radius: 12px;
+  padding: 28px 16px;
+  box-shadow: 0 2px 12px rgba(0,0,0,.07);
+  cursor: pointer;
+  transition: transform .15s, box-shadow .15s;
+  text-align: center;
+}
+
+.dash-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 24px rgba(26,58,92,.15);
+}
+
+.dash-card:focus-visible {
+  outline: 3px solid #c8a84b;
+  outline-offset: 2px;
+}
+
+.dash-card-icon { font-size: 36px; }
+
+.dash-card-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1a3a5c;
+  line-height: 1.3;
+}
+
+/* Info strip */
+.dashboard-info {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.info-item {
+  flex: 1;
+  min-width: 160px;
+  background: #fff;
+  border-radius: 10px;
+  padding: 16px 20px;
+  box-shadow: 0 1px 8px rgba(0,0,0,.06);
+  border-top: 3px solid #c8a84b;
+}
+
+.info-label {
+  display: block;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: .6px;
+  color: #6b7a8d;
+  margin-bottom: 6px;
+}
+
+.info-value {
+  display: block;
+  font-size: 16px;
+  font-weight: 700;
+  color: #1a3a5c;
+}

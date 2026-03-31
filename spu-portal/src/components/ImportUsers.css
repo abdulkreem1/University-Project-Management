@@ -1,0 +1,139 @@
+.import-page {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 32px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.import-info-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  background: #e8f0fe;
+  border-left: 4px solid #1a3a5c;
+  border-radius: 8px;
+  padding: 20px 24px;
+}
+
+.import-info-icon { font-size: 32px; flex-shrink: 0; }
+
+.import-info-card h2 {
+  font-size: 17px;
+  font-weight: 700;
+  color: #1a3a5c;
+  margin-bottom: 6px;
+}
+
+.import-info-card p {
+  font-size: 14px;
+  color: #3d5a80;
+  line-height: 1.6;
+}
+
+.import-card {
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 2px 16px rgba(0,0,0,.08);
+  padding: 28px 32px;
+}
+
+.file-drop-zone {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border: 2px dashed #b0bec5;
+  border-radius: 8px;
+  padding: 20px;
+  cursor: pointer;
+  font-size: 14px;
+  color: #6b7a8d;
+  transition: border-color .2s, background .2s;
+}
+.file-drop-zone:hover { border-color: #1a3a5c; background: #f0f4ff; }
+.file-drop-icon { font-size: 24px; }
+
+.import-btn {
+  width: 100%;
+  justify-content: center;
+  padding: 12px;
+  font-size: 15px;
+}
+
+/* Results table */
+.results-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #1a3a5c;
+  margin-bottom: 16px;
+}
+
+.table-wrapper { overflow-x: auto; }
+
+.users-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.users-table th {
+  background: #1a3a5c;
+  color: #fff;
+  padding: 10px 14px;
+  text-align: left;
+  font-weight: 600;
+  letter-spacing: .3px;
+}
+
+.users-table td {
+  padding: 10px 14px;
+  border-bottom: 1px solid #eef0f4;
+  color: #2d3748;
+}
+
+.users-table tr:last-child td { border-bottom: none; }
+.users-table tr:hover td { background: #f7f9fc; }
+
+.users-table code {
+  background: #f0f4ff;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 13px;
+  color: #1a3a5c;
+}
+
+/* Role badge */
+.role-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.role-badge--student { background: #e8f4fd; color: #1565c0; }
+.role-badge--doctor  { background: #e8f5e9; color: #2e7d32; }
+
+.results-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.dashboard-hint {
+  font-size: 12px;
+  color: #6b7a8d;
+  font-style: italic;
+}
+
+.import-note {
+  margin-top: 14px;
+  font-size: 13px;
+  color: #3d5a80;
+  background: #e8f0fe;
+  padding: 10px 14px;
+  border-radius: 6px;
+}
