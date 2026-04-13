@@ -1,5 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import './RoleDashboard.css';
+import HodProposalReview from './HodProposalReview';
+import HodIdeaReview from './HodIdeaReview';
+import HodApplicationReview from './HodApplicationReview';
 
 const DEPT_LABELS = {
   software_engineering:    'Software Engineering',
@@ -10,14 +13,21 @@ const DEPT_LABELS = {
 };
 
 const CARDS = [
-  { icon: '👥', label: 'Faculty Members', desc: 'View department staff' },
-  { icon: '📚', label: 'Manage Courses',  desc: 'Courses in your department' },
-  { icon: '✅', label: 'Approve Projects', desc: 'Review student projects' },
-  { icon: '📊', label: 'Reports',          desc: 'Department statistics' },
+  { icon: '👥', label: 'Faculty Members',      desc: 'View department staff',                    page: null },
+  { icon: '📚', label: 'Manage Courses',       desc: 'Courses in your department',               page: null },
+  { icon: '💡', label: 'Doctor Ideas',         desc: 'Review & approve doctor project ideas',    page: 'ideas' },
+  { icon: '📋', label: 'Student Proposals',    desc: 'Review & approve student proposals',       page: 'proposals' },
+  { icon: '📩', label: 'Idea Applications',    desc: 'Register student applications on ideas',   page: 'applications' },
+  { icon: '📊', label: 'Reports',              desc: 'Department statistics',                    page: null },
 ];
 
 export default function HodDashboard({ user }) {
+  const [page, setPage] = useState('dashboard');
   const deptLabel = DEPT_LABELS[user.department] || 'Your Department';
+
+  if (page === 'ideas')        return <HodIdeaReview        onBack={() => setPage('dashboard')} />;
+  if (page === 'proposals')    return <HodProposalReview    onBack={() => setPage('dashboard')} />;
+  if (page === 'applications') return <HodApplicationReview onBack={() => setPage('dashboard')} />;
 
   return (
     <div className="role-dashboard">
@@ -30,8 +40,17 @@ export default function HodDashboard({ user }) {
       </div>
 
       <div className="role-grid" role="list">
-        {CARDS.map(c => (
-          <div key={c.label} className="role-card" role="listitem">
+        {CARDS.map((c) => (
+          <div
+            key={c.label}
+            className="role-card"
+            role="listitem"
+            onClick={() => c.page && setPage(c.page)}
+            style={c.page ? { cursor: 'pointer' } : undefined}
+            tabIndex={c.page ? 0 : undefined}
+            onKeyDown={c.page ? (e) => e.key === 'Enter' && setPage(c.page) : undefined}
+            aria-label={c.page ? `Go to ${c.label}` : undefined}
+          >
             <span className="role-card-icon" aria-hidden="true">{c.icon}</span>
             <span className="role-card-label">{c.label}</span>
             <span className="role-card-desc">{c.desc}</span>

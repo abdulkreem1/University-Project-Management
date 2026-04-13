@@ -1,0 +1,170 @@
+.propose-wrap {
+  max-width: 700px;
+  margin: 0 auto;
+  padding: 32px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.propose-page-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.propose-page-header h2 {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--primary);
+  margin: 0;
+}
+
+.btn-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  color: var(--primary);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 6px 10px;
+  border-radius: var(--radius);
+  transition: background .15s;
+}
+.btn-back:hover { background: rgba(26,58,92,.08); }
+
+.propose-card {
+  background: var(--card);
+  border-radius: 14px;
+  box-shadow: var(--shadow);
+  padding: 32px;
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+@media (max-width: 520px) { .form-row { grid-template-columns: 1fr; } }
+
+.btn-full { width: 100%; justify-content: center; padding: 12px; font-size: 15px; margin-top: 4px; }
+
+/* ── Existing proposal status card ── */
+.propose-status-card {
+  background: var(--card);
+  border-radius: 14px;
+  box-shadow: var(--shadow);
+  padding: 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  border-left: 5px solid var(--primary);
+}
+
+.propose-status-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.propose-status-top h3 {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--primary);
+  margin: 0;
+}
+
+.propose-status-desc {
+  font-size: 14px;
+  color: var(--muted);
+  line-height: 1.6;
+  margin: 0;
+}
+
+.propose-status-meta {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 12px;
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 16px;
+}
+
+.propose-meta-item { display: flex; flex-direction: column; gap: 4px; }
+.propose-meta-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  color: var(--muted);
+}
+.propose-meta-value {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--primary);
+  text-transform: capitalize;
+}
+
+/* ── Status badges ── */
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.badge--pending  { background: #fff8e1; color: #7a5c00;  border: 1.5px solid var(--accent); }
+.badge--hod      { background: #ede7f6; color: #4a148c;  border: 1.5px solid #7b1fa2; }
+.badge--approved { background: #e8f5e9; color: #1b5e20;  border: 1.5px solid #2e7d32; }
+.badge--rejected { background: #fdecea; color: #b71c1c;  border: 1.5px solid var(--danger); }
+
+/* ── Success ── */
+.propose-success {
+  background: var(--card);
+  border-radius: 14px;
+  box-shadow: var(--shadow);
+  padding: 56px 32px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+}
+.propose-success-icon { font-size: 56px; }
+.propose-success h2   { font-size: 22px; font-weight: 700; color: var(--primary); margin: 0; }
+.propose-success p    { font-size: 14px; color: var(--muted); margin: 0; }
+
+.propose-loading {
+  text-align: center;
+  color: var(--muted);
+  font-size: 14px;
+  padding: 40px 0;
+}
+
+/* ── Team members list ── */
+.propose-members {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+}
+
+.propose-member-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13px;
+  color: var(--primary);
+  flex-wrap: wrap;
+}

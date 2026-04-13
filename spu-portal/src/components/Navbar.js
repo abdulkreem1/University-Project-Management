@@ -1,5 +1,6 @@
 import React from 'react';
 import './Navbar.css';
+import NotificationBell from './NotificationBell';
 
 const ROLE_LABELS = {
   dean: 'Dean',
@@ -10,6 +11,8 @@ const ROLE_LABELS = {
 };
 
 export default function Navbar({ user, onLogout }) {
+  const showBell = ['student', 'doctor', 'hod'].includes(user.role);
+
   return (
     <nav className="navbar" role="navigation" aria-label="Main navigation">
       <div className="navbar-brand">
@@ -21,6 +24,7 @@ export default function Navbar({ user, onLogout }) {
       </div>
 
       <div className="navbar-user">
+        {showBell && <NotificationBell />}
         <div className="user-info">
           <span className="user-name">{user.username}</span>
           <span className="user-role">{ROLE_LABELS[user.role] || user.role}</span>
