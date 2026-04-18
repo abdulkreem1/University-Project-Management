@@ -1,4 +1,5 @@
 from django.contrib.auth import get_user_model
+from django.db import transaction
 from .models import (
     ProjectIdea, StudentIdeaProposal, ProjectApplication,
     IdeaApplication, TeamInvitation, ProposalInvitation,
@@ -84,16 +85,15 @@ def create_student_proposal(*, student, supervisor, title, description, departme
     if not allowed:
         return {'ok': False, 'error': error}
 
-    # Validate team_size_reason requirement
-    needs_reason = team_size < 2 or team_size > 3
-    if needs_reason and not team_size_reason.strip():
-        return {'ok': False, 'error': 'Please provide a reason for the non-standard team size.'}
+    # Team size must be 2 or 3 — solo not allowed
+    if team_size not in (2, 3):
+        return {'ok': False, 'error': 'Team size must be 2 or 3 students.'}
 
-    expected_members = max(0, team_size - 1) if 2 <= team_size <= 3 else 0
+    expected_members = team_size - 1  # 1 or 2 additional members
     if len(member_ids) != expected_members:
         return {'ok': False, 'error': f'Please provide {expected_members} additional member ID(s).'}
 
-    # Validate members (only for standard sizes 2-3)
+    # Validate members
     members = []
     for uid in member_ids:
         try:
@@ -107,13 +107,12 @@ def create_student_proposal(*, student, supervisor, title, description, departme
             return {'ok': False, 'error': f'Student "{uid}": {err}'}
         members.append(m)
 
-    # Determine initial status
-    initial_status = 'pending_supervisor' if not members else 'awaiting_members'
+    initial_status = 'awaiting_members'  # always wait for members since team_size >= 2
 
     proposal = StudentIdeaProposal.objects.create(
         student=student, supervisor=supervisor, title=title,
         description=description, department=department,
-        team_size=team_size, team_size_reason=team_size_reason,
+        team_size=team_size, team_size_reason='',
         status=initial_status,
     )
 
@@ -132,6 +131,30 @@ def create_student_proposal(*, student, supervisor, title, description, departme
     return {'ok': True, 'proposal': proposal}
 
 
+def cancel_proposal(*, proposal, student):
+    """Leader cancels their proposal before it's approved."""
+    if proposal.student != student:
+        return {'ok': False, 'error': 'You are not the owner of this proposal.'}
+    if proposal.status == 'assigned':
+        return {'ok': False, 'error': 'Cannot cancel an already assigned proposal.'}
+    if proposal.status == 'rejected':
+        return {'ok': False, 'error': 'Proposal is already rejected.'}
+
+    proposal.status = 'rejected'
+    proposal.rejection_reason = 'Cancelled by the proposing student.'
+    proposal.save(update_fields=['status', 'rejection_reason', 'updated_at'])
+
+    accepted = list(proposal.invitations.filter(status='accepted').select_related('invitee'))
+    proposal.invitations.update(status='rejected')
+
+    for inv in accepted:
+        notify(inv.invitee, 'proposal_rejected',
+               'Proposal Cancelled',
+               f'The proposal "{proposal.title}" you were part of has been cancelled by the proposer.')
+
+    return {'ok': True}
+
+
 def respond_to_proposal_invitation(*, invitation, action):
     if invitation.status != 'pending':
         return {'ok': False, 'error': 'Invitation already responded to.'}
@@ -139,22 +162,33 @@ def respond_to_proposal_invitation(*, invitation, action):
     if action == 'reject':
         invitation.status = 'rejected'
         invitation.save(update_fields=['status', 'updated_at'])
-        # Cancel the whole proposal
         proposal = invitation.proposal
-        proposal.status = 'rejected'
-        proposal.rejection_reason = f'Team member {invitation.invitee.username} declined the invitation.'
-        proposal.save(update_fields=['status', 'rejection_reason', 'updated_at'])
-        # Free other accepted members
-        proposal.invitations.filter(status='accepted').update(status='rejected')
+        # Notify leader to replace the member instead of cancelling
+        notify(proposal.student, 'invitation_rejected',
+               'Team Member Declined',
+               f'{invitation.invitee.get_full_name() or invitation.invitee.username} declined your invitation for "{proposal.title}". You can replace them.')
         return {'ok': True, 'invitation': invitation}
+
+    # ── Guard: check invitee has no active project before accepting ──
+    active, msg = _student_is_active(invitation.invitee)
+    if active:
+        invitation.status = 'rejected'
+        invitation.save(update_fields=['status', 'updated_at'])
+        proposal = invitation.proposal
+        notify(proposal.student, 'invitation_rejected',
+               'Team Member Unavailable',
+               f'{invitation.invitee.get_full_name() or invitation.invitee.username} is unavailable for "{proposal.title}". You can replace them.')
+        return {'ok': False, 'error': f'You cannot accept this invitation: {msg}'}
 
     invitation.status = 'accepted'
     invitation.save(update_fields=['status', 'updated_at'])
 
-    # Check if ALL invitations accepted → advance to pending_supervisor
     proposal = invitation.proposal
     if proposal.status == 'awaiting_members':
-        if proposal.invitations.filter(status='pending').count() == 0:
+        # Only advance if ALL invitations are accepted (no pending, no rejected-without-replacement)
+        pending_count = proposal.invitations.filter(status='pending').count()
+        rejected_count = proposal.invitations.filter(status='rejected').count()
+        if pending_count == 0 and rejected_count == 0:
             proposal.status = 'pending_supervisor'
             proposal.save(update_fields=['status', 'updated_at'])
             notify(proposal.supervisor, 'proposal_submitted',
@@ -165,6 +199,69 @@ def respond_to_proposal_invitation(*, invitation, action):
            f'{invitation.invitee.get_full_name() or invitation.invitee.username} accepted your team invitation for "{proposal.title}".')
 
     return {'ok': True, 'invitation': invitation}
+
+
+def replace_proposal_member(*, proposal, old_member_id, new_member_id):
+    """Leader replaces a rejected invitee with a new one."""
+    if proposal.status != 'awaiting_members':
+        return {'ok': False, 'error': 'Proposal is not in awaiting members state.'}
+
+    try:
+        old_inv = proposal.invitations.get(invitee__username=old_member_id, status='rejected')
+    except ProposalInvitation.DoesNotExist:
+        return {'ok': False, 'error': 'No rejected invitation found for this member.'}
+
+    try:
+        new_member = User.objects.get(username=str(new_member_id), role='student')
+    except User.DoesNotExist:
+        return {'ok': False, 'error': f'Student with ID "{new_member_id}" not found.'}
+
+    if new_member == proposal.student:
+        return {'ok': False, 'error': 'You cannot add yourself as a team member.'}
+
+    active, err = _student_is_active(new_member)
+    if active:
+        return {'ok': False, 'error': f'Student "{new_member_id}": {err}'}
+
+    # Remove old rejected invitation and create new one
+    old_inv.delete()
+    ProposalInvitation.objects.create(proposal=proposal, invitee=new_member, status='pending')
+    notify(new_member, 'invitation_received',
+           'Team Invitation Received 📨',
+           f'{proposal.student.get_full_name() or proposal.student.username} invited you to join their project proposal "{proposal.title}".')
+
+    return {'ok': True}
+
+
+def replace_application_member(*, application, old_member_id, new_member_id):
+    """Leader replaces a rejected invitee with a new one in an IdeaApplication."""
+    if application.status != 'awaiting_members':
+        return {'ok': False, 'error': 'Application is not in awaiting members state.'}
+
+    try:
+        old_inv = application.invitations.get(invitee__username=old_member_id, status='rejected')
+    except TeamInvitation.DoesNotExist:
+        return {'ok': False, 'error': 'No rejected invitation found for this member.'}
+
+    try:
+        new_member = User.objects.get(username=str(new_member_id), role='student')
+    except User.DoesNotExist:
+        return {'ok': False, 'error': f'Student with ID "{new_member_id}" not found.'}
+
+    if new_member == application.student:
+        return {'ok': False, 'error': 'You cannot add yourself as a team member.'}
+
+    active, err = _student_is_active(new_member)
+    if active:
+        return {'ok': False, 'error': f'Student "{new_member_id}": {err}'}
+
+    old_inv.delete()
+    TeamInvitation.objects.create(application=application, invitee=new_member, status='pending')
+    notify(new_member, 'invitation_received',
+           'Team Invitation Received 📨',
+           f'{application.student.get_full_name() or application.student.username} invited you to join their application for "{application.idea.title}".')
+
+    return {'ok': True}
 
 
 def supervisor_review_proposal(*, proposal, action, rejection_reason=''):
@@ -250,56 +347,59 @@ def student_can_apply(student):
 
 
 def apply_on_idea(*, student, idea, team_size, member_ids):
-    if idea.status != 'approved':
-        return {'ok': False, 'error': 'This idea is not available for applications.'}
+    with transaction.atomic():
+        # Lock the idea row to prevent race conditions
+        idea = ProjectIdea.objects.select_for_update().get(pk=idea.pk)
 
-    # Block if idea already has a registered application
-    if IdeaApplication.objects.filter(idea=idea, status='registered').exists():
-        return {'ok': False, 'error': 'This idea has already been taken by another team.'}
+        if idea.status != 'approved':
+            return {'ok': False, 'error': 'This idea is not available for applications.'}
 
-    if team_size not in (1, 2, 3):
-        return {'ok': False, 'error': 'Team size must be 1, 2, or 3.'}
+        if IdeaApplication.objects.filter(idea=idea, status='registered').exists():
+            return {'ok': False, 'error': 'This idea has already been taken by another team.'}
 
-    if team_size > idea.max_team_size:
-        return {'ok': False, 'error': f'This idea allows a maximum of {idea.max_team_size} students.'}
+        if team_size not in (1, 2, 3):
+            return {'ok': False, 'error': 'Team size must be 1, 2, or 3.'}
 
-    if len(member_ids) != team_size - 1:
-        return {'ok': False, 'error': f'Please provide {team_size - 1} additional member ID(s).'}
+        if team_size != idea.max_team_size:
+            return {'ok': False, 'error': f'This idea requires exactly {idea.max_team_size} students.'}
 
-    allowed, error = student_can_apply(student)
-    if not allowed:
-        return {'ok': False, 'error': error}
+        if len(member_ids) != team_size - 1:
+            return {'ok': False, 'error': f'Please provide {team_size - 1} additional member ID(s).'}
 
-    # Validate members
-    members = []
-    for uid in member_ids:
-        try:
-            m = User.objects.get(username=str(uid), role='student')
-        except User.DoesNotExist:
-            return {'ok': False, 'error': f'Student with ID "{uid}" not found.'}
-        if m == student:
-            return {'ok': False, 'error': 'You cannot add yourself as a team member.'}
-        ok, err = student_can_apply(m)
-        if not ok:
-            return {'ok': False, 'error': f'Student "{uid}": {err}'}
-        members.append(m)
+        allowed, error = student_can_apply(student)
+        if not allowed:
+            return {'ok': False, 'error': error}
 
-    # Check active slot availability (only one active application per idea at a time)
-    active_count = IdeaApplication.objects.filter(
-        idea=idea, status__in=['awaiting_members', 'pending_doctor', 'pending_hod'],
-    ).count()
-    if active_count >= idea.max_team_size:
-        return {'ok': False, 'error': 'This idea has reached its maximum team size.'}
+        # Validate members
+        members = []
+        for uid in member_ids:
+            try:
+                m = User.objects.get(username=str(uid), role='student')
+            except User.DoesNotExist:
+                return {'ok': False, 'error': f'Student with ID "{uid}" not found.'}
+            if m == student:
+                return {'ok': False, 'error': 'You cannot add yourself as a team member.'}
+            ok, err = student_can_apply(m)
+            if not ok:
+                return {'ok': False, 'error': f'Student "{uid}": {err}'}
+            members.append(m)
 
-    initial_status = 'pending_doctor' if team_size == 1 else 'awaiting_members'
-    app = IdeaApplication.objects.create(
-        student=student, idea=idea, team_size=team_size, status=initial_status,
-    )
-    for m in members:
-        TeamInvitation.objects.create(application=app, invitee=m, status='pending')
-        notify(m, 'invitation_received',
-               'Team Invitation Received 📨',
-               f'{student.get_full_name() or student.username} invited you to join their application for "{idea.title}".')
+        # Re-check slot availability inside the lock
+        active_count = IdeaApplication.objects.filter(
+            idea=idea, status__in=['awaiting_members', 'pending_doctor', 'pending_hod'],
+        ).count()
+        if active_count >= idea.max_team_size:
+            return {'ok': False, 'error': 'This idea has reached its maximum team size.'}
+
+        initial_status = 'pending_doctor' if team_size == 1 else 'awaiting_members'
+        app = IdeaApplication.objects.create(
+            student=student, idea=idea, team_size=team_size, status=initial_status,
+        )
+        for m in members:
+            TeamInvitation.objects.create(application=app, invitee=m, status='pending')
+            notify(m, 'invitation_received',
+                   'Team Invitation Received 📨',
+                   f'{student.get_full_name() or student.username} invited you to join their application for "{idea.title}".')
 
     return {'ok': True, 'application': app}
 
@@ -311,28 +411,36 @@ def respond_to_invitation(*, invitation, action):
     if action == 'reject':
         invitation.status = 'rejected'
         invitation.save(update_fields=['status', 'updated_at'])
-        # Cancel the whole application if any member rejects
         app = invitation.application
-        app.status = 'rejected'
-        app.rejection_reason = f'Team member {invitation.invitee.username} declined the invitation.'
-        app.save(update_fields=['status', 'rejection_reason', 'updated_at'])
+        notify(app.student, 'invitation_rejected',
+               'Team Member Declined',
+               f'{invitation.invitee.get_full_name() or invitation.invitee.username} declined your invitation for "{app.idea.title}". You can replace them.')
         return {'ok': True, 'invitation': invitation}
+
+    # ── Guard: check invitee has no active project before accepting ──
+    active, msg = _student_is_active(invitation.invitee)
+    if active:
+        invitation.status = 'rejected'
+        invitation.save(update_fields=['status', 'updated_at'])
+        app = invitation.application
+        notify(app.student, 'invitation_rejected',
+               'Team Member Unavailable',
+               f'{invitation.invitee.get_full_name() or invitation.invitee.username} is unavailable for "{app.idea.title}". You can replace them.')
+        return {'ok': False, 'error': f'You cannot accept this invitation: {msg}'}
 
     invitation.status = 'accepted'
     invitation.save(update_fields=['status', 'updated_at'])
 
-    # Check if ALL invitations are now accepted → advance to pending_doctor
     app = invitation.application
     if app.status == 'awaiting_members':
-        pending_count = app.invitations.filter(status='pending').count()
-        if pending_count == 0:
+        pending_count  = app.invitations.filter(status='pending').count()
+        rejected_count = app.invitations.filter(status='rejected').count()
+        if pending_count == 0 and rejected_count == 0:
             app.status = 'pending_doctor'
             app.save(update_fields=['status', 'updated_at'])
-            # Notify doctor
             notify(app.idea.doctor, 'application_submitted',
                    'New Application Pending Review',
                    f'{app.student.get_full_name() or app.student.username} and their team applied for your idea "{app.idea.title}".')
-    # Notify leader
     notify(app.student, 'invitation_accepted',
            'Team Member Accepted',
            f'{invitation.invitee.get_full_name() or invitation.invitee.username} accepted your team invitation for "{app.idea.title}".')

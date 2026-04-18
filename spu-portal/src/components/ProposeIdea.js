@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { submitStudentProposal, fetchMyProposal, fetchDoctorsList } from '../api';
+import { submitStudentProposal, fetchMyProposal, fetchDoctorsList, replaceProposalMember, cancelProposal } from '../api';
 import StudentSearch from './StudentSearch';
 import './ProposeIdea.css';
+import './SupervisorReview.css';
 
 const DEPARTMENTS = [
   { value: 'software_engineering',    label: 'Software Engineering' },
@@ -20,7 +21,7 @@ const STATUS_META = {
 };
 
 const EMPTY = { title: '', description: '', department: '', supervisor: '',
-                team_size: 2, team_size_reason: '', member_ids: [''] };
+                team_size: 2, member_ids: [''] };
 
 export default function ProposeIdea({ onBack }) {
   const [existing, setExisting]     = useState(undefined);
@@ -29,6 +30,10 @@ export default function ProposeIdea({ onBack }) {
   const [loading, setLoading]       = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError]           = useState('');
+  // Replace member state
+  const [replacing, setReplacing]   = useState(null); // { old_id }
+  const [newMemberId, setNewMemberId] = useState('');
+  const [replaceError, setReplaceError] = useState('');
 
   useEffect(() => {
     setLoading(true);
@@ -48,13 +53,10 @@ export default function ProposeIdea({ onBack }) {
 
   const handleTeamSizeChange = (size) => {
     const s = Number(size);
-    // Standard sizes 2-3 need member fields; others just need a reason
-    const memberCount = (s >= 2 && s <= 3) ? s - 1 : 0;
     setForm((prev) => ({
       ...prev,
       team_size: s,
-      member_ids: Array(memberCount).fill(''),
-      team_size_reason: (s < 2 || s > 3) ? prev.team_size_reason : '',
+      member_ids: Array(s - 1).fill(''),
     }));
   };
 
@@ -79,7 +81,7 @@ export default function ProposeIdea({ onBack }) {
         department:       form.department,
         supervisor:       Number(form.supervisor),
         team_size:        Number(form.team_size),
-        team_size_reason: form.team_size_reason,
+        team_size_reason: '',
         member_ids:       form.member_ids.filter(Boolean),
       });
       setExisting(res.data.proposal);
@@ -149,11 +151,48 @@ export default function ProposeIdea({ onBack }) {
               {existing.invitations.map((inv) => (
                 <div key={inv.id} className="propose-member-row">
                   <span>{inv.invitee_name} ({inv.invitee_id})</span>
-                  <span className={`status-badge ${inv.status === 'accepted' ? 'badge--approved' : inv.status === 'rejected' ? 'badge--rejected' : 'badge--pending'}`}>
-                    {inv.status === 'accepted' ? '✅' : inv.status === 'rejected' ? '❌' : '⏳'} {inv.status}
-                  </span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span className={`status-badge ${inv.status === 'accepted' ? 'badge--approved' : inv.status === 'rejected' ? 'badge--rejected' : 'badge--pending'}`}>
+                      {inv.status === 'accepted' ? '✅' : inv.status === 'rejected' ? '❌' : '⏳'} {inv.status}
+                    </span>
+                    {inv.status === 'rejected' && existing.status === 'awaiting_members' && (
+                      <button className="btn btn-outline" style={{ fontSize: 12, padding: '3px 10px' }}
+                        onClick={() => { setReplacing({ old_id: inv.invitee_id }); setNewMemberId(''); setReplaceError(''); }}>
+                        Replace
+                      </button>
+                    )}
+                  </div>
                 </div>
               ))}
+            </div>
+          )}
+
+          {/* Replace member modal */}
+          {replacing && (
+            <div className="sv-modal-overlay" role="dialog" aria-modal="true">
+              <div className="sv-modal">
+                <h3>Replace Team Member</h3>
+                <p className="sv-modal-note">Replace <strong>{replacing.old_id}</strong> with a new member:</p>
+                <div className="form-group" style={{ marginTop: 16 }}>
+                  <label>New Member</label>
+                  <StudentSearch value={newMemberId} onChange={setNewMemberId} placeholder="Search by name or ID…" />
+                </div>
+                {replaceError && <div className="alert alert-error">{replaceError}</div>}
+                <div className="sv-modal-actions">
+                  <button className="btn btn-primary" onClick={async () => {
+                    setReplaceError('');
+                    try {
+                      await replaceProposalMember(existing.id, replacing.old_id, newMemberId);
+                      const res = await fetchMyProposal();
+                      setExisting(res.data);
+                      setReplacing(null);
+                    } catch (err) {
+                      setReplaceError(err.response?.data?.error || 'Failed to replace member.');
+                    }
+                  }}>Confirm</button>
+                  <button className="btn btn-outline" onClick={() => setReplacing(null)}>Cancel</button>
+                </div>
+              </div>
             </div>
           )}
 
@@ -171,6 +210,23 @@ export default function ProposeIdea({ onBack }) {
           )}
           {existing.status === 'pending_hod' && (
             <div className="alert alert-info">Approved by supervisor — awaiting HoD review.</div>
+          )}
+
+          {/* Cancel button — only before final decision */}
+          {['awaiting_members', 'pending_supervisor', 'pending_hod'].includes(existing.status) && (
+            <button className="btn btn-danger" style={{ alignSelf: 'flex-start' }}
+              onClick={async () => {
+                if (!window.confirm('Are you sure you want to cancel this proposal? All team members will be notified.')) return;
+                try {
+                  await cancelProposal(existing.id);
+                  const res = await fetchMyProposal();
+                  setExisting(res.data);
+                } catch (err) {
+                  alert(err.response?.data?.error || 'Failed to cancel.');
+                }
+              }}>
+              🗑 Cancel Proposal
+            </button>
           )}
         </div>
       </div>
@@ -240,26 +296,12 @@ export default function ProposeIdea({ onBack }) {
             <select id="p-team" className="form-control"
               value={form.team_size}
               onChange={(e) => handleTeamSizeChange(e.target.value)}>
-              {[1, 2, 3, 4].map((n) => (
-                <option key={n} value={n}>{n} student{n > 1 ? 's' : ''}</option>
-              ))}
+              <option value={2}>2 students (you + 1)</option>
+              <option value={3}>3 students (you + 2)</option>
             </select>
           </div>
 
-          {/* Reason for non-standard size */}
-          {needsReason && (
-            <div className="form-group">
-              <label htmlFor="p-reason">
-                Justification for {form.team_size === 1 ? 'solo' : `${form.team_size}-student`} team *
-              </label>
-              <textarea id="p-reason" name="team_size_reason" rows={3} className="form-control"
-                value={form.team_size_reason} onChange={handleChange}
-                placeholder={form.team_size < 2
-                  ? 'Explain why you are working alone…'
-                  : 'Explain why your team needs more than 3 members…'}
-                required />
-            </div>
-          )}
+          {/* No reason field needed — only 2 or 3 allowed */}
 
           {/* Member fields for standard sizes */}
           {form.member_ids.map((val, idx) => (

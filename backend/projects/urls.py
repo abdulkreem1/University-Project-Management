@@ -1,7 +1,8 @@
 from django.urls import path
 from .views import (
     submit_idea, my_ideas,
-    propose_idea, my_proposal, list_doctors_for_student, list_students_for_team,
+    propose_idea, my_proposal, cancel_proposal_view,
+    list_doctors_for_student, list_students_for_team,
     supervisor_pending_proposals, supervisor_review,
     hod_pending_proposals, hod_review,
     hod_pending_doctor_ideas, hod_review_idea,
@@ -10,6 +11,7 @@ from .views import (
     hod_pending_applications, hod_review_app,
     my_invitations, respond_invitation,
     my_proposal_invitations, respond_proposal_invitation,
+    replace_proposal_member_view, replace_application_member_view,
 )
 
 urlpatterns = [
@@ -20,6 +22,7 @@ urlpatterns = [
     # UC-02 — Student proposal
     path('api/projects/proposals/submit/',                   propose_idea,                 name='propose_idea'),
     path('api/projects/proposals/mine/',                     my_proposal,                  name='my_proposal'),
+    path('api/projects/proposals/<int:proposal_id>/cancel/', cancel_proposal_view,         name='cancel_proposal'),
     path('api/projects/doctors/',                            list_doctors_for_student,     name='doctors_for_student'),
     path('api/projects/students/',                           list_students_for_team,       name='students_for_team'),
 
@@ -55,4 +58,8 @@ urlpatterns = [
     # Proposal invitations (student proposals)
     path('api/projects/proposal-invitations/mine/',                  my_proposal_invitations,        name='my_proposal_invitations'),
     path('api/projects/proposal-invitations/<int:inv_id>/respond/',  respond_proposal_invitation,    name='respond_proposal_invitation'),
+
+    # Replace rejected members
+    path('api/projects/proposals/<int:proposal_id>/replace-member/', replace_proposal_member_view,   name='replace_proposal_member'),
+    path('api/projects/applications/<int:app_id>/replace-member/',   replace_application_member_view, name='replace_application_member'),
 ]

@@ -45,10 +45,10 @@ class ProjectIdea(models.Model):
 
 class StudentIdeaProposal(models.Model):
     """Student-proposed project idea (UC-02)."""
-    student          = models.OneToOneField(
+    student          = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
-        related_name='idea_proposal',
+        related_name='idea_proposals',
         limit_choices_to={'role': 'student'},
     )
     supervisor       = models.ForeignKey(

@@ -43,14 +43,10 @@ export default function BrowseIdeas({ onBack }) {
   }, []);
 
   const openApply = (idea) => {
+    const size = idea.max_team_size;
     setApplyModal(idea);
-    setApplyForm({ team_size: 1, member_ids: [] });
+    setApplyForm({ team_size: size, member_ids: Array(size - 1).fill('') });
     setApplyError('');
-  };
-
-  const handleTeamSizeChange = (size) => {
-    const s = Number(size);
-    setApplyForm({ team_size: s, member_ids: Array(s - 1).fill('') });
   };
 
   const handleMemberChange = (idx, val) => {
@@ -193,22 +189,14 @@ export default function BrowseIdeas({ onBack }) {
         <div className="sv-modal-overlay" role="dialog" aria-modal="true">
           <div className="sv-modal">
             <h3>📩 Apply: {applyModal.title}</h3>
-            <p className="sv-modal-note">Max team size: <strong>{applyModal.max_team_size}</strong></p>
-
-            <div className="form-group" style={{ marginTop: 16 }}>
-              <label htmlFor="team-size">Team Size</label>
-              <select id="team-size" className="form-control"
-                value={applyForm.team_size}
-                onChange={(e) => handleTeamSizeChange(e.target.value)}>
-                {Array.from({ length: applyModal.max_team_size }, (_, i) => i + 1).map((n) => (
-                  <option key={n} value={n}>{n} student{n > 1 ? 's' : ''}</option>
-                ))}
-              </select>
-            </div>
+            <p className="sv-modal-note">
+              This idea requires exactly <strong>{applyModal.max_team_size} students</strong>.
+              {applyModal.max_team_size > 1 && ` Add ${applyModal.max_team_size - 1} team member(s) below.`}
+            </p>
 
             {applyForm.member_ids.map((val, idx) => (
-              <div className="form-group" key={idx}>
-                <label htmlFor={`member-${idx}`}>Member {idx + 2} — Search by name or ID</label>
+              <div className="form-group" key={idx} style={{ marginTop: 12 }}>
+                <label htmlFor={`member-${idx}`}>Member {idx + 2} — Search by name or ID *</label>
                 <StudentSearch
                   id={`member-${idx}`}
                   value={val}

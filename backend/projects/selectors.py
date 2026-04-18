@@ -18,7 +18,14 @@ def get_all_ideas():
 
 
 def get_student_proposal(student):
-    """Return the student's proposal (any status) or None."""
+    """Return the student's latest active proposal, or the latest one of any status."""
+    active = StudentIdeaProposal.objects.filter(
+        student=student,
+        status__in=['awaiting_members', 'pending_supervisor', 'pending_hod', 'assigned'],
+    ).order_by('-created_at').first()
+    if active:
+        return active
+    # Fall back to latest (rejected) so student can see history
     return StudentIdeaProposal.objects.filter(student=student).order_by('-created_at').first()
 
 

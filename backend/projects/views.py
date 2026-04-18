@@ -16,11 +16,12 @@ from .serializers import (
     TeamInvitationSerializer, ProposalInvitationSerializer,
 )
 from .services import (
-    create_project_idea, create_student_proposal,
+    create_project_idea, create_student_proposal, cancel_proposal,
     supervisor_review_proposal, hod_review_proposal,
     hod_review_doctor_idea,
     apply_on_idea, doctor_review_application, hod_review_application,
     respond_to_invitation, respond_to_proposal_invitation,
+    replace_proposal_member, replace_application_member,
 )
 from .models import StudentIdeaProposal, ProjectIdea, IdeaApplication, TeamInvitation, ProposalInvitation
 
@@ -87,6 +88,19 @@ def my_proposal(request):
     if not proposal:
         return Response(None)
     return Response(StudentIdeaProposalSerializer(proposal).data)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated, IsStudent])
+def cancel_proposal_view(request, proposal_id):
+    try:
+        proposal = StudentIdeaProposal.objects.get(pk=proposal_id, student=request.user)
+    except StudentIdeaProposal.DoesNotExist:
+        return Response({'error': 'Proposal not found.'}, status=404)
+    result = cancel_proposal(proposal=proposal, student=request.user)
+    if not result['ok']:
+        return Response({'error': result['error']}, status=400)
+    return Response({'message': 'Proposal cancelled successfully.'})
 
 
 @api_view(['GET'])
@@ -373,3 +387,41 @@ def respond_proposal_invitation(request, inv_id):
     if not result['ok']:
         return Response({'error': result['error']}, status=400)
     return Response(ProposalInvitationSerializer(result['invitation']).data)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated, IsStudent])
+def replace_proposal_member_view(request, proposal_id):
+    try:
+        proposal = StudentIdeaProposal.objects.get(pk=proposal_id, student=request.user)
+    except StudentIdeaProposal.DoesNotExist:
+        return Response({'error': 'Proposal not found.'}, status=404)
+
+    old_id = request.data.get('old_member_id', '').strip()
+    new_id = request.data.get('new_member_id', '').strip()
+    if not old_id or not new_id:
+        return Response({'error': 'old_member_id and new_member_id are required.'}, status=400)
+
+    result = replace_proposal_member(proposal=proposal, old_member_id=old_id, new_member_id=new_id)
+    if not result['ok']:
+        return Response({'error': result['error']}, status=400)
+    return Response({'message': 'Member replaced successfully.'})
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated, IsStudent])
+def replace_application_member_view(request, app_id):
+    try:
+        application = IdeaApplication.objects.get(pk=app_id, student=request.user)
+    except IdeaApplication.DoesNotExist:
+        return Response({'error': 'Application not found.'}, status=404)
+
+    old_id = request.data.get('old_member_id', '').strip()
+    new_id = request.data.get('new_member_id', '').strip()
+    if not old_id or not new_id:
+        return Response({'error': 'old_member_id and new_member_id are required.'}, status=400)
+
+    result = replace_application_member(application=application, old_member_id=old_id, new_member_id=new_id)
+    if not result['ok']:
+        return Response({'error': result['error']}, status=400)
+    return Response({'message': 'Member replaced successfully.'})

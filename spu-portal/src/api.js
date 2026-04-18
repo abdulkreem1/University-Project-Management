@@ -137,3 +137,13 @@ export const markNotifRead = (id) =>
 
 export const markAllNotifsRead = () =>
   api.post('/api/notifications/mark-all-read/');
+
+// ── Replace rejected team members ─────────────────────────────────────────────
+export const replaceProposalMember = (proposalId, old_member_id, new_member_id) =>
+  api.post(`/api/projects/proposals/${proposalId}/replace-member/`, { old_member_id, new_member_id });
+
+export const replaceApplicationMember = (appId, old_member_id, new_member_id) =>
+  api.post(`/api/projects/applications/${appId}/replace-member/`, { old_member_id, new_member_id });
+
+export const cancelProposal = (proposalId) =>
+  api.post(`/api/projects/proposals/${proposalId}/cancel/`);
