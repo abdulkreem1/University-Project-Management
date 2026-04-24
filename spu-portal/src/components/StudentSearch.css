@@ -22,9 +22,9 @@
   left: 0;
   right: 0;
   background: var(--card);
-  border: 1.5px solid #d0d7e2;
-  border-radius: var(--radius);
-  box-shadow: 0 6px 20px rgba(0,0,0,.12);
+  border: 1px solid #E2E8F0;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.03);
   list-style: none;
   margin: 0;
   padding: 4px 0;
@@ -44,7 +44,7 @@
 }
 
 .ss-option:hover {
-  background: #f0f4f8;
+  background: #F8F9FD;
 }
 
 .ss-option-name {
@@ -59,8 +59,8 @@
 
 .ss-option-id {
   font-size: 12px;
-  color: var(--muted);
-  background: #f0f4f8;
+  color: #8B60A5;
+  background: rgba(139, 96, 165, 0.1);
   padding: 2px 8px;
   border-radius: 12px;
   white-space: nowrap;

@@ -1,21 +1,22 @@
 .sv-wrap {
-  max-width: 800px;
+  max-width: 900px;
   margin: 0 auto;
-  padding: 32px 16px;
+  padding: 32px 24px;
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 24px;
 }
 
 .sv-header {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 16px;
+  margin-bottom: 8px;
 }
 
 .sv-header h2 {
-  font-size: 20px;
-  font-weight: 700;
+  font-size: 24px;
+  font-weight: 800;
   color: var(--primary);
   margin: 0;
 }
@@ -23,52 +24,31 @@
 .btn-back {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  background: none;
-  border: none;
-  color: var(--primary);
+  gap: 8px;
+  background: #fff;
+  border: 1.5px solid #E2E8F0;
+  color: var(--text);
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 700;
   cursor: pointer;
-  padding: 6px 10px;
-  border-radius: var(--radius);
-  transition: background .15s;
+  padding: 8px 16px;
+  border-radius: 30px;
+  transition: all 0.2s;
 }
-.btn-back:hover { background: rgba(26,58,92,.08); }
-
-.sv-loading {
-  text-align: center;
-  color: var(--muted);
-  font-size: 14px;
-  padding: 40px 0;
-}
-
-.sv-empty {
-  background: var(--card);
-  border-radius: 14px;
-  box-shadow: var(--shadow);
-  padding: 56px 32px;
-  text-align: center;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 12px;
-  font-size: 40px;
-}
-.sv-empty p { font-size: 15px; color: var(--muted); margin: 0; }
+.btn-back:hover { background: #F8F9FD; border-color: var(--primary); color: var(--primary); }
 
 /* ── Cards ── */
-.sv-list { display: flex; flex-direction: column; gap: 14px; }
+.sv-list { display: flex; flex-direction: column; gap: 16px; }
 
 .sv-card {
   background: var(--card);
   border-radius: 12px;
-  box-shadow: var(--shadow);
-  padding: 22px 24px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+  padding: 24px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  border-left: 5px solid var(--accent);
+  gap: 16px;
+  border: 1px solid #E2E8F0;
 }
 
 .sv-card-top {
@@ -76,23 +56,23 @@
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
-  flex-wrap: wrap;
 }
 
 .sv-card-title {
-  font-size: 16px;
-  font-weight: 700;
-  color: var(--primary);
-  margin: 0 0 4px;
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--text);
+  margin: 0 0 6px;
 }
 
 .sv-card-student {
-  font-size: 13px;
+  font-size: 14px;
   color: var(--muted);
+  font-weight: 600;
 }
 
 .sv-card-desc {
-  font-size: 13px;
+  font-size: 14px;
   color: var(--muted);
   line-height: 1.6;
   margin: 0;
@@ -104,59 +84,59 @@
 
 .sv-card-actions {
   display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 8px;
 }
 
 .meta-tag {
-  background: #f0f4f8;
-  color: var(--primary);
-  font-size: 12px;
-  padding: 3px 10px;
-  border-radius: 20px;
-  font-weight: 500;
-  text-transform: capitalize;
-  white-space: nowrap;
+  background: #F1F5F9;
+  color: #475569;
+  font-size: 11px;
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-weight: 700;
+  text-transform: uppercase;
 }
 
 /* ── Modal ── */
 .sv-modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0,0,0,.45);
+  background: rgba(139, 96, 165, 0.4);
+  backdrop-filter: blur(4px);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 1000;
-  padding: 16px;
+  padding: 24px;
 }
 
 .sv-modal {
   background: var(--card);
-  border-radius: 14px;
-  box-shadow: 0 8px 40px rgba(0,0,0,.22);
-  padding: 32px;
+  border-radius: 16px;
+  box-shadow: 0 20px 50px rgba(0,0,0,0.1);
+  padding: 40px;
   width: 100%;
-  max-width: 460px;
+  max-width: 500px;
+  border: 1px solid #E2E8F0;
 }
 
 .sv-modal h3 {
-  font-size: 18px;
-  font-weight: 700;
+  font-size: 20px;
+  font-weight: 800;
   color: var(--primary);
-  margin: 0 0 4px;
+  margin-bottom: 20px;
 }
 
 .sv-modal-note {
-  font-size: 13px;
+  font-size: 14px;
   color: var(--muted);
-  margin: 12px 0 0;
+  margin: 16px 0 0;
   line-height: 1.6;
 }
 
 .sv-modal-actions {
   display: flex;
-  gap: 10px;
-  margin-top: 20px;
-  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 32px;
 }

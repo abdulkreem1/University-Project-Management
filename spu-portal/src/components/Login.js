@@ -27,66 +27,76 @@ export default function Login({ onLogin, onRegister }) {
   };
 
   return (
-    <div className="login-page">
-      <div className="login-card">
-        {/* Header */}
-        <div className="login-header">
-          <div className="login-logo">🎓</div>
-          <h1>Syrian Private University</h1>
-          <p>Academic Management Portal</p>
+    <div className="login-split-container">
+      {/* Left Side: Branding */}
+      <div className="login-branding">
+        <div className="branding-overlay"></div>
+        <div className="branding-content">
+          <div className="branding-logo">🎓</div>
+          <h2>Syrian Private University</h2>
+          <p>Graduation Project Management Ecosystem   </p>
         </div>
+      </div>
 
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="login-form">
-          {error && <div className="alert alert-error">{error}</div>}
+      {/* Right Side: Form */}
+      <div className="login-form-container">
+        <div className="login-form-inner">
+          <div className="login-mobile-logo">🎓</div>
+          <h1 className="login-title">Academic Portal</h1>
+          <p className="login-subtitle">Sign in to manage your project</p>
 
-          <div className="form-group">
-            <label htmlFor="username">Username</label>
-            <input
-              id="username"
-              className="form-control"
-              type="text"
-              placeholder="Enter your username"
-              value={form.username}
-              onChange={(e) => setForm({ ...form, username: e.target.value })}
-              required
-              autoComplete="username"
-            />
-          </div>
+          <form onSubmit={handleSubmit} className="login-form-main">
+            {error && <div className="alert alert-error">{error}</div>}
 
-          <div className="form-group">
-            <label htmlFor="password">Password</label>
-            <input
-              id="password"
-              className="form-control"
-              type="password"
-              placeholder="Enter your password"
-              value={form.password}
-              onChange={(e) => setForm({ ...form, password: e.target.value })}
-              required
-              autoComplete="current-password"
-            />
-          </div>
+            <div className="form-group">
+              <label htmlFor="username">Username</label>
+              <input
+                id="username"
+                className="form-control"
+                type="text"
+                placeholder="e.g. 4210XXXX"
+                value={form.username}
+                onChange={(e) => setForm({ ...form, username: e.target.value })}
+                required
+              />
+            </div>
 
-          <button className="btn btn-primary login-btn" type="submit" disabled={loading}>
-            {loading ? 'Signing in…' : 'Sign In'}
-          </button>
-        </form>
+            <div className="form-group">
+              <label htmlFor="password">Password</label>
+              <input
+                id="password"
+                className="form-control"
+                type="password"
+                placeholder="••••••••"
+                value={form.password}
+                onChange={(e) => setForm({ ...form, password: e.target.value })}
+                required
+              />
+            </div>
 
-        <p className="login-footer">
-          Syrian Private University &copy; {new Date().getFullYear()}
-        </p>
-        {onRegister && (
-          <div style={{ textAlign: 'center', paddingBottom: '20px' }}>
-            <button
-              type="button"
-              style={{ background: 'none', border: 'none', color: '#c8a84b', fontSize: '13px', cursor: 'pointer' }}
-              onClick={onRegister}
-            >
-              First time? Verify your ID and create an account
+            <button className="btn btn-primary login-btn-modern" type="submit" disabled={loading}>
+              {loading ? (
+                <>
+                  <span className="spinner"></span>
+                  Signing in...
+                </>
+              ) : 'Sign In'}
             </button>
-          </div>
-        )}
+          </form>
+
+          {onRegister && (
+            <div className="login-registration-cue">
+              <span>New to the portal?</span>
+              <button type="button" onClick={onRegister} className="btn-link">
+                Register now
+              </button>
+            </div>
+          )}
+
+          <footer className="login-form-footer">
+            &copy; {new Date().getFullYear()} Syrian Private University | Faculty of AI Engineering
+          </footer>
+        </div>
       </div>
     </div>
   );

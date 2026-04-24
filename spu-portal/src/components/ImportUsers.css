@@ -1,139 +1,221 @@
-.import-page {
-  max-width: 760px;
-  margin: 0 auto;
-  padding: 32px 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 24px;
+/* Premium Import Layout */
+.import-wrapper {
+  /* Inherits from .premium-dashboard in App.css */
 }
 
-.import-info-card {
+/* Modern Info Banner */
+.import-info-banner {
   display: flex;
   align-items: flex-start;
   gap: 16px;
-  background: #e8f0fe;
-  border-left: 4px solid #1a3a5c;
-  border-radius: 8px;
+  background: var(--surface);
+  border: 1px solid #E2E8F0;
+  border-radius: 12px;
   padding: 20px 24px;
 }
 
-.import-info-icon { font-size: 32px; flex-shrink: 0; }
-
-.import-info-card h2 {
-  font-size: 17px;
-  font-weight: 700;
-  color: #1a3a5c;
-  margin-bottom: 6px;
+.import-info-icon {
+  color: var(--primary);
+  display: flex;
 }
 
-.import-info-card p {
+.import-info-text {
   font-size: 14px;
-  color: #3d5a80;
   line-height: 1.6;
+  color: var(--text);
 }
 
+.import-info-text code {
+  background: #EDF2F7;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 13px;
+  color: var(--primary);
+  font-weight: 600;
+}
+
+/* Form Card */
 .import-card {
-  background: #fff;
-  border-radius: 12px;
-  box-shadow: 0 2px 16px rgba(0,0,0,.08);
-  padding: 28px 32px;
+  background: var(--card);
+  border-radius: 16px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.03);
+  padding: 32px;
+  border: 1px solid #E2E8F0;
 }
 
+.import-form-grid {
+  display: grid;
+  grid-template-columns: 1fr 2fr;
+  gap: 32px;
+  margin-bottom: 24px;
+}
+
+@media (max-width: 800px) {
+  .import-form-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* File Drop Zone Premium */
 .file-drop-zone {
   display: flex;
+  flex-direction: column;
   align-items: center;
+  justify-content: center;
   gap: 12px;
-  border: 2px dashed #b0bec5;
-  border-radius: 8px;
-  padding: 20px;
+  border: 2px dashed #CBD5E0;
+  border-radius: 12px;
+  padding: 32px 24px;
   cursor: pointer;
-  font-size: 14px;
-  color: #6b7a8d;
-  transition: border-color .2s, background .2s;
+  background: #FAFBFC;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  text-align: center;
 }
-.file-drop-zone:hover { border-color: #1a3a5c; background: #f0f4ff; }
-.file-drop-icon { font-size: 24px; }
+
+.file-drop-zone:hover, .file-drop-zone.drag-over {
+  border-color: var(--primary);
+  background: rgba(139, 96, 165, 0.04);
+}
+
+.file-drop-zone.has-file {
+  border: 2px solid var(--success);
+  background: #F0FFF4;
+}
+
+.file-drop-icon {
+  color: var(--muted);
+  transition: color 0.2s;
+}
+
+.file-drop-zone:hover .file-drop-icon {
+  color: var(--primary);
+}
+
+.file-drop-zone.has-file .file-drop-icon {
+  color: var(--success);
+}
+
+.file-drop-text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.drop-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.drop-subtitle {
+  font-size: 13px;
+  color: var(--muted);
+}
 
 .import-btn {
   width: 100%;
-  justify-content: center;
-  padding: 12px;
-  font-size: 15px;
-}
-
-/* Results table */
-.results-title {
+  padding: 14px;
   font-size: 15px;
   font-weight: 700;
-  color: #1a3a5c;
-  margin-bottom: 16px;
+  border-radius: 8px;
 }
 
-.table-wrapper { overflow-x: auto; }
-
-.users-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 14px;
+/* Results header */
+.results-header-modern {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+  gap: 16px;
 }
 
-.users-table th {
-  background: #1a3a5c;
-  color: #fff;
-  padding: 10px 14px;
-  text-align: left;
-  font-weight: 600;
-  letter-spacing: .3px;
-}
-
-.users-table td {
-  padding: 10px 14px;
-  border-bottom: 1px solid #eef0f4;
-  color: #2d3748;
-}
-
-.users-table tr:last-child td { border-bottom: none; }
-.users-table tr:hover td { background: #f7f9fc; }
-
-.users-table code {
-  background: #f0f4ff;
-  padding: 2px 8px;
-  border-radius: 4px;
-  font-size: 13px;
-  color: #1a3a5c;
+.results-title {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--text);
 }
 
 /* Role badge */
 .role-badge {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 3px 10px;
-  border-radius: 20px;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 30px;
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 700;
 }
-.role-badge--student { background: #e8f4fd; color: #1565c0; }
-.role-badge--doctor  { background: #e8f5e9; color: #2e7d32; }
+.role-badge--student { background: #EBF8FF; color: #2B6CB0; }
+.role-badge--doctor  { background: #F0FFF4; color: #276749; }
 
-.results-title {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
+/* Table Wrapper */
+.table-wrapper {
+  overflow-x: auto;
+  border: 1px solid #E2E8F0;
+  border-radius: 12px;
+  margin-bottom: 20px;
+}
+
+.users-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.users-table th {
+  background: #F8F9FD;
+  color: var(--muted);
+  padding: 16px 20px;
+  text-align: left;
+  font-weight: 700;
+  text-transform: uppercase;
+  font-size: 12px;
+  letter-spacing: 0.5px;
+  border-bottom: 1px solid #E2E8F0;
+}
+
+.users-table td {
+  padding: 16px 20px;
+  border-bottom: 1px solid #EDF2F7;
+  color: var(--text);
+  font-weight: 500;
+  font-size: 14px;
+}
+
+.users-table tr:last-child td { border-bottom: none; }
+.users-table tr:hover td { background: #FAFBFC; }
+
+.password-pill {
+  background: #F1F5F9;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 13px;
+  color: var(--text);
+  font-weight: 700;
+  border: 1px solid #E2E8F0;
 }
 
 .dashboard-hint {
-  font-size: 12px;
-  color: #6b7a8d;
-  font-style: italic;
+  font-size: 13px;
+  color: var(--muted);
 }
 
-.import-note {
-  margin-top: 14px;
-  font-size: 13px;
-  color: #3d5a80;
-  background: #e8f0fe;
-  padding: 10px 14px;
-  border-radius: 6px;
+.import-note-modern {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  background: #FAFBFC;
+  border-radius: 12px;
+  border: 1px solid #EDF2F7;
 }
+
+.import-note-icon {
+  color: var(--primary);
+}
+
+.import-note-modern p {
+  font-size: 14px;
+  color: var(--muted);
+}
+

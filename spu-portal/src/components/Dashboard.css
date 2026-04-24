@@ -1,111 +1,145 @@
-.dashboard {
-  max-width: 960px;
-  margin: 0 auto;
-  padding: 32px 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 28px;
-}
-
-/* Welcome banner */
-.welcome-banner {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  background: linear-gradient(135deg, #1a3a5c, #0d2137);
-  color: #fff;
-  border-radius: 14px;
-  padding: 28px 32px;
-  border-left: 6px solid #c8a84b;
-  box-shadow: 0 4px 20px rgba(26,58,92,.25);
-}
-
-.welcome-banner h1 {
-  font-size: 24px;
-  font-weight: 700;
-  margin-bottom: 6px;
-}
-
-.welcome-banner p {
-  font-size: 14px;
-  opacity: .75;
-  text-transform: uppercase;
-  letter-spacing: .5px;
-}
-
-.welcome-badge { font-size: 52px; }
-
-/* Grid */
-.dashboard-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-  gap: 18px;
-}
-
-.dash-card {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-  background: #fff;
-  border: none;
+/* Term Badge (Lernata style alert) */
+.pd-term-badge {
+  background: #FFF8EE;
+  border: 1px solid #FFE4C4;
+  padding: 12px 20px;
   border-radius: 12px;
-  padding: 28px 16px;
-  box-shadow: 0 2px 12px rgba(0,0,0,.07);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  box-shadow: 0 4px 12px rgba(217, 119, 6, 0.05);
+}
+
+.pd-term-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: #B45309;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.pd-term-value {
+  font-size: 15px;
+  font-weight: 800;
+  color: #92400E;
+}
+
+/* Metrics Row (Bento Feel) */
+.pd-metrics-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 20px;
+}
+
+.pd-metric-card {
+  background: #fff;
+  border: 1px solid #E2E8F0;
+  border-radius: 16px;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.02);
+}
+
+.pd-metric-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.pd-metric-value {
+  font-size: 36px;
+  font-weight: 800;
+  color: var(--text);
+  line-height: 1;
+}
+
+.pd-metric-warning {
+  color: #D97706;
+}
+
+/* Modules Grid */
+.pd-section-title {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--text);
+  margin-bottom: 20px;
+}
+
+.pd-modules-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 16px;
+}
+
+.pd-module-card {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  background: #fff;
+  border: 1px solid #E2E8F0;
+  border-radius: 12px;
+  padding: 20px;
   cursor: pointer;
-  transition: transform .15s, box-shadow .15s;
-  text-align: center;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  text-align: left;
 }
 
-.dash-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 8px 24px rgba(26,58,92,.15);
+.pd-module-card:hover {
+  background: #F8F9FD;
+  border-color: var(--primary);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(139, 96, 165, 0.08);
 }
 
-.dash-card:focus-visible {
-  outline: 3px solid #c8a84b;
+.pd-module-card:hover .pd-module-arrow {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.pd-module-card:focus-visible {
+  outline: 3px solid rgba(139, 96, 165, 0.3);
   outline-offset: 2px;
 }
 
-.dash-card-icon { font-size: 36px; }
-
-.dash-card-label {
-  font-size: 13px;
-  font-weight: 600;
-  color: #1a3a5c;
-  line-height: 1.3;
-}
-
-/* Info strip */
-.dashboard-info {
+.pd-module-icon {
   display: flex;
-  gap: 16px;
-  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  background: rgba(139, 96, 165, 0.08);
+  color: var(--primary);
+  border-radius: 12px;
+  flex-shrink: 0;
 }
 
-.info-item {
+.pd-module-info {
   flex: 1;
-  min-width: 160px;
-  background: #fff;
-  border-radius: 10px;
-  padding: 16px 20px;
-  box-shadow: 0 1px 8px rgba(0,0,0,.06);
-  border-top: 3px solid #c8a84b;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
-.info-label {
-  display: block;
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: .6px;
-  color: #6b7a8d;
-  margin-bottom: 6px;
-}
-
-.info-value {
-  display: block;
-  font-size: 16px;
+.pd-module-label {
+  font-size: 15px;
   font-weight: 700;
-  color: #1a3a5c;
+  color: var(--text);
 }
+
+.pd-module-desc {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.pd-module-arrow {
+  color: var(--primary);
+  opacity: 0;
+  transform: translateX(-8px);
+  transition: all 0.2s ease;
+}
+

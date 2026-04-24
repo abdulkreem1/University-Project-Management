@@ -2,15 +2,21 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background: linear-gradient(90deg, #1a3a5c, #0d2137);
-  color: #fff;
-  padding: 0 32px;
+  background: #fff;
+  color: var(--text);
+  padding: 0 24px;
   height: 64px;
-  box-shadow: 0 2px 12px rgba(0,0,0,.2);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.05);
   position: sticky;
   top: 0;
   z-index: 100;
-  border-bottom: 3px solid #c8a84b;
+  border-bottom: 1px solid #E2E8F0;
+}
+
+.navbar-left {
+  display: flex;
+  align-items: center;
+  gap: 32px;
 }
 
 .navbar-brand {
@@ -19,49 +25,70 @@
   gap: 12px;
 }
 
-.navbar-logo { font-size: 28px; }
+.navbar-logo { font-size: 24px; }
 
 .navbar-title {
-  display: block;
   font-size: 16px;
-  font-weight: 700;
-  letter-spacing: .2px;
+  font-weight: 800;
+  color: var(--primary);
+  letter-spacing: -0.5px;
 }
 
-.navbar-subtitle {
-  display: block;
-  font-size: 11px;
-  opacity: .65;
-  text-transform: uppercase;
-  letter-spacing: .8px;
+/* Breadcrumbs */
+.breadcrumbs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.breadcrumb-separator {
+  opacity: 0.4;
+  font-size: 10px;
+}
+
+.breadcrumb-current {
+  color: var(--text);
+  font-weight: 600;
 }
 
 .navbar-user {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 20px;
 }
 
-.user-info { text-align: right; }
+.user-profile-trigger {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 4px;
+  padding-left: 12px;
+  background: #F8F9FD;
+  border-radius: 30px;
+  border: 1px solid #E2E8F0;
+}
 
 .user-name {
   display: block;
-  font-size: 14px;
-  font-weight: 600;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
 }
 
 .user-role {
   display: block;
   font-size: 11px;
-  opacity: .65;
+  color: var(--muted);
+  font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: .5px;
 }
 
 .navbar-logout {
-  border-color: rgba(255,255,255,.5);
-  color: #fff;
-  font-size: 13px;
-  padding: 7px 16px;
+  padding: 6px 16px;
+  font-size: 12px;
+  font-weight: 700;
+  border-radius: 20px;
 }
-.navbar-logout:hover { border-color: #c8a84b; color: #c8a84b; opacity: 1; }
