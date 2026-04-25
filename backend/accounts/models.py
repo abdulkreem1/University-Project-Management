@@ -13,10 +13,9 @@ DEPARTMENTS = [
 
 class User(AbstractUser):
     ROLE_CHOICES = [
-        ('dean', 'Dean'),
-        ('admin', 'Administrator'),
-        ('hod', 'Head of Department'),
-        ('doctor', 'Doctor'),
+        ('dean',    'Dean'),
+        ('hod',     'Head of Department'),
+        ('doctor',  'Doctor'),
         ('student', 'Student'),
     ]
 
@@ -26,4 +25,11 @@ class User(AbstractUser):
 
     def __str__(self):
         return self.username
+
+    def save(self, *args, **kwargs):
+        # Dean is always superuser and staff
+        if self.role == 'dean':
+            self.is_superuser = True
+            self.is_staff = True
+        super().save(*args, **kwargs)
 

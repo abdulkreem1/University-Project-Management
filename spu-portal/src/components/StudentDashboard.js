@@ -3,6 +3,7 @@ import './RoleDashboard.css';
 import ProposeIdea from './ProposeIdea';
 import BrowseIdeas from './BrowseIdeas';
 import MyInvitations from './MyInvitations';
+import MyProject from './MyProject';
 
 /* Premium SVG Icons */
 const Icons = {
@@ -12,6 +13,7 @@ const Icons = {
   Search: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>,
   Lightbulb: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M12 2A7 7 0 0 0 5 9c0 2.38 1.19 4.47 3 5.74V17a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1v-2.26c1.81-1.27 3-3.36 3-5.74a7 7 0 0 0-7-7z"/></svg>,
   Mail: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>,
+  Kanban: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="5" height="18" rx="1"/><rect x="10" y="3" width="5" height="12" rx="1"/><rect x="17" y="3" width="5" height="15" rx="1"/></svg>,
   ChevronRight: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>,
   Dashboard: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
 };
@@ -23,6 +25,7 @@ const CARDS = [
   { icon: Icons.Search, label: 'Browse Ideas',     desc: 'Browse & apply on project ideas', page: 'browse' },
   { icon: Icons.Lightbulb, label: 'Propose Idea',     desc: 'Submit your own project idea',    page: 'propose' },
   { icon: Icons.Mail, label: 'Team Invitations', desc: 'Respond to team invitations',     page: 'invitations' },
+  { icon: Icons.Kanban, label: 'My Project',       desc: 'Manage your project board',        page: 'myproject' },
 ];
 
 function SidebarItem({ icon, label, active, onClick }) {
@@ -45,6 +48,7 @@ export default function StudentDashboard({ user }) {
     if (page === 'propose')     return <ProposeIdea    onBack={() => setPage('dashboard')} />;
     if (page === 'browse')      return <BrowseIdeas    onBack={() => setPage('dashboard')} />;
     if (page === 'invitations') return <MyInvitations  onBack={() => setPage('dashboard')} />;
+    if (page === 'myproject')   return <MyProject user={user} />;
 
     return (
       <div className="premium-dashboard">
@@ -134,6 +138,12 @@ export default function StudentDashboard({ user }) {
             label="Team Invitations"    
             active={page === 'invitations'}  
             onClick={() => setPage('invitations')} 
+          />
+          <SidebarItem 
+            icon={Icons.Kanban} 
+            label="My Project"    
+            active={page === 'myproject'}  
+            onClick={() => setPage('myproject')} 
           />
         </nav>
       </aside>

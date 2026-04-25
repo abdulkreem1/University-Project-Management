@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { submitStudentProposal, fetchMyProposal, fetchDoctorsList } from '../api';
+import { submitStudentProposal, fetchMyProposal, fetchDoctorsList, fetchStudentForm } from '../api';
 import StudentSearch from './StudentSearch';
 import './ProposeIdea.css';
 
@@ -42,6 +42,10 @@ export default function ProposeIdea({ onBack }) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError]           = useState('');
 
+  // Dynamic form state
+  const [dynForm, setDynForm]       = useState(null);
+  const [dynValues, setDynValues]   = useState({});
+
   useEffect(() => {
     setLoading(true);
     Promise.all([fetchMyProposal(), fetchDoctorsList()])
@@ -52,6 +56,19 @@ export default function ProposeIdea({ onBack }) {
       .catch(() => setError('Failed to load data. Please try again.'))
       .finally(() => setLoading(false));
   }, []);
+
+  // Load dynamic form when department changes
+  useEffect(() => {
+    if (!form.department) { setDynForm(null); return; }
+    fetchStudentForm(form.department, 'propose')
+      .then(res => {
+        setDynForm(res.data?.fields?.length ? res.data : null);
+        const init = {};
+        (res.data?.fields || []).forEach(f => { init[f.id] = ''; });
+        setDynValues(init);
+      })
+      .catch(() => setDynForm(null));
+  }, [form.department]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -93,6 +110,11 @@ export default function ProposeIdea({ onBack }) {
         team_size:        Number(form.team_size),
         team_size_reason: form.team_size_reason,
         member_ids:       form.member_ids.filter(Boolean),
+        // dynamic form fields sent together in the same request
+        form_id:          dynForm?.id || null,
+        field_responses:  dynForm
+          ? (dynForm.fields || []).map(f => ({ field: f.id, value: dynValues[f.id] || '' }))
+          : [],
       });
       setExisting(res.data.proposal);
     } catch (err) {
@@ -320,6 +342,23 @@ export default function ProposeIdea({ onBack }) {
             </div>
           ))}
 
+          {/* Dynamic fields from HoD */}
+          {dynForm && (dynForm.fields || []).length > 0 && (
+            <div className="propose-dyn-section">
+              <div className="propose-dyn-label">
+                {dynForm.title || 'Additional Department Requirements'}
+              </div>
+              {dynForm.fields.map(field => (
+                <ProposeDynField
+                  key={field.id}
+                  field={field}
+                  value={dynValues[field.id] || ''}
+                  onChange={val => setDynValues(prev => ({ ...prev, [field.id]: val }))}
+                />
+              ))}
+            </div>
+          )}
+
           <div className="submit-action-area">
             <button type="submit" className="btn btn-primary btn-submit-modern" disabled={submitting}>
               <span>{submitting ? 'Submitting Proposal…' : 'Submit Proposal'}</span>
@@ -330,4 +369,28 @@ export default function ProposeIdea({ onBack }) {
       </div>
     </div>
   );
+}
+
+// ── Inline dynamic field renderer for ProposeIdea ────────────────────────────
+function ProposeDynField({ field, value, onChange }) {
+  const { label, field_type, required, options } = field;
+  const lbl = <label className="form-label">{label}{required && <span style={{color:'#ef4444'}}> *</span>}</label>;
+
+  if (field_type === 'text')
+    return <div className="form-group">{lbl}<input className="form-control" type="text" value={value} required={required} onChange={e => onChange(e.target.value)} /></div>;
+  if (field_type === 'textarea')
+    return <div className="form-group">{lbl}<textarea className="form-control" rows={3} value={value} required={required} onChange={e => onChange(e.target.value)} /></div>;
+  if (field_type === 'number')
+    return <div className="form-group">{lbl}<input className="form-control" type="number" value={value} required={required} min="0" step="any" onChange={e => onChange(e.target.value)} style={{maxWidth:120}} /></div>;
+  if (field_type === 'date')
+    return <div className="form-group">{lbl}<input className="form-control" type="date" value={value} required={required} onChange={e => onChange(e.target.value)} /></div>;
+  if (field_type === 'select')
+    return <div className="form-group">{lbl}<div className="select-wrapper"><select className="form-control" value={value} required={required} onChange={e => onChange(e.target.value)}><option value="">Select...</option>{(options||[]).map(o=><option key={o} value={o}>{o}</option>)}</select></div></div>;
+  if (field_type === 'radio')
+    return <div className="form-group">{lbl}<div style={{display:'flex',flexDirection:'column',gap:6}}>{(options||[]).map(o=><label key={o} style={{display:'flex',alignItems:'center',gap:8,fontSize:14}}><input type="radio" name={`dyn-${field.id}`} value={o} checked={value===o} onChange={()=>onChange(o)} required={required}/>{o}</label>)}</div></div>;
+  if (field_type === 'checkbox')
+    return <div className="form-group">{lbl}<div style={{display:'flex',flexDirection:'column',gap:6}}>{(options||[]).map(o=>{const checked=(value||'').split(',').includes(o);const toggle=()=>{const cur=value?value.split(',').filter(Boolean):[];onChange(checked?cur.filter(v=>v!==o).join(','):[...cur,o].join(','))};return<label key={o} style={{display:'flex',alignItems:'center',gap:8,fontSize:14}}><input type="checkbox" checked={checked} onChange={toggle}/>{o}</label>;})}</div></div>;
+  if (field_type === 'file')
+    return <div className="form-group">{lbl}<input className="form-control" type="file" required={required} accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.gif" onChange={e=>{const file=e.target.files?.[0];if(file)onChange(file.name);}}/><small style={{fontSize:12,color:'#64748b',marginTop:4,display:'block'}}>Upload a file (PDF, DOC, or image)</small></div>;
+  return null;
 }

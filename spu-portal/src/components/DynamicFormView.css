@@ -1,0 +1,132 @@
+.dfv-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.dfv-form-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-primary, #1e293b);
+  margin: 0 0 4px;
+}
+
+.dfv-section-label {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-secondary, #64748b);
+  margin-bottom: -8px;
+}
+
+.dfv-divider {
+  border: none;
+  border-top: 1px solid var(--border, #e2e8f0);
+  margin: 4px 0;
+}
+
+.dfv-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.dfv-label {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary, #1e293b);
+}
+
+.dfv-required {
+  color: #ef4444;
+  margin-left: 2px;
+}
+
+.dfv-input {
+  padding: 9px 12px;
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 8px;
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.dfv-input:focus { border-color: var(--primary, #6366f1); }
+.dfv-input--sm   { max-width: 120px; }
+
+.dfv-textarea {
+  padding: 9px 12px;
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 8px;
+  font-size: 14px;
+  outline: none;
+  resize: vertical;
+  font-family: inherit;
+}
+
+.dfv-textarea:focus { border-color: var(--primary, #6366f1); }
+
+.dfv-select {
+  padding: 9px 12px;
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 8px;
+  font-size: 14px;
+  background: #fff;
+  outline: none;
+}
+
+.dfv-select:focus { border-color: var(--primary, #6366f1); }
+
+.dfv-radio-group,
+.dfv-checkbox-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.dfv-radio-label,
+.dfv-checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.dfv-error {
+  color: #ef4444;
+  font-size: 13px;
+  background: #fee2e2;
+  border-radius: 7px;
+  padding: 8px 12px;
+}
+
+.dfv-submit-btn {
+  padding: 11px 28px;
+  background: var(--primary, #6366f1);
+  color: #fff;
+  border: none;
+  border-radius: 9px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  align-self: flex-end;
+  transition: opacity 0.15s;
+}
+
+.dfv-submit-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+.dfv-submit-btn:hover:not(:disabled) { opacity: 0.9; }
+
+.dfv-loading {
+  text-align: center;
+  color: var(--text-secondary, #64748b);
+  font-size: 13px;
+  padding: 12px;
+}
+
+.dfv-hint {
+  font-size: 12px;
+  color: var(--text-secondary, #64748b);
+  margin-top: -2px;
+}

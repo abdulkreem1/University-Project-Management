@@ -1,6 +1,7 @@
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from django.db import transaction
 
 from accounts.models import User
 from .permissions import IsDoctor, IsStudent, IsHod
@@ -24,6 +25,26 @@ from .services import (
     replace_proposal_member, replace_application_member,
 )
 from .models import StudentIdeaProposal, ProjectIdea, IdeaApplication, TeamInvitation, ProposalInvitation
+
+# helper to save dynamic form response inside an existing transaction
+def _save_form_response(student, form_id, field_responses, proposal_id=None, application_id=None):
+    """Save a FormResponse + FieldResponses if form_id and field_responses are provided."""
+    if not form_id or not isinstance(field_responses, list):
+        return
+    from dy_forms.models import DynamicForm, FormResponse, FieldResponse
+    try:
+        form = DynamicForm.objects.get(pk=form_id)
+    except DynamicForm.DoesNotExist:
+        return
+    resp = FormResponse.objects.create(
+        form=form, student=student,
+        proposal_id=proposal_id, application_id=application_id,
+    )
+    for fr in field_responses:
+        field_id = fr.get('field')
+        value    = fr.get('value', '')
+        if field_id:
+            FieldResponse.objects.create(response=resp, field_id=field_id, value=value)
 
 
 # ── UC-01: Doctor ideas ───────────────────────────────────────────────────────
@@ -60,19 +81,29 @@ def propose_idea(request):
     team_size        = int(request.data.get('team_size', 1))
     team_size_reason = request.data.get('team_size_reason', '').strip()
     member_ids       = request.data.get('member_ids', [])
+    form_id          = request.data.get('form_id')
+    field_responses  = request.data.get('field_responses', [])
 
-    result = create_student_proposal(
-        student=request.user,
-        supervisor=serializer.validated_data['supervisor'],
-        title=serializer.validated_data['title'],
-        description=serializer.validated_data['description'],
-        department=serializer.validated_data['department'],
-        team_size=team_size,
-        team_size_reason=team_size_reason,
-        member_ids=member_ids,
-    )
-    if not result['ok']:
-        return Response({'error': result['error']}, status=400)
+    with transaction.atomic():
+        result = create_student_proposal(
+            student=request.user,
+            supervisor=serializer.validated_data['supervisor'],
+            title=serializer.validated_data['title'],
+            description=serializer.validated_data['description'],
+            department=serializer.validated_data['department'],
+            team_size=team_size,
+            team_size_reason=team_size_reason,
+            member_ids=member_ids,
+        )
+        if not result['ok']:
+            return Response({'error': result['error']}, status=400)
+
+        _save_form_response(
+            student=request.user,
+            form_id=form_id,
+            field_responses=field_responses,
+            proposal_id=result['proposal'].id,
+        )
 
     return Response(
         {'message': 'Proposal submitted successfully.',
@@ -252,12 +283,23 @@ def apply_idea(request, idea_id):
     except ProjectIdea.DoesNotExist:
         return Response({'error': 'Idea not found.'}, status=404)
 
-    team_size  = int(request.data.get('team_size', 1))
-    member_ids = request.data.get('member_ids', [])
+    team_size       = int(request.data.get('team_size', 1))
+    member_ids      = request.data.get('member_ids', [])
+    form_id         = request.data.get('form_id')
+    field_responses = request.data.get('field_responses', [])
 
-    result = apply_on_idea(student=request.user, idea=idea, team_size=team_size, member_ids=member_ids)
-    if not result['ok']:
-        return Response({'error': result['error']}, status=400)
+    with transaction.atomic():
+        result = apply_on_idea(student=request.user, idea=idea, team_size=team_size, member_ids=member_ids)
+        if not result['ok']:
+            return Response({'error': result['error']}, status=400)
+
+        _save_form_response(
+            student=request.user,
+            form_id=form_id,
+            field_responses=field_responses,
+            application_id=result['application'].id,
+        )
+
     return Response(IdeaApplicationSerializer(result['application']).data, status=201)
 
 

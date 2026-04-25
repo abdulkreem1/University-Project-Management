@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { fetchHodPendingApplications, hodReviewApplication } from '../api';
+import { fetchHodPendingApplications, hodReviewApplication, fetchResponseByApplication } from '../api';
 import './SupervisorReview.css';
 
 export default function HodApplicationReview({ onBack }) {
@@ -9,10 +9,19 @@ export default function HodApplicationReview({ onBack }) {
   const [reviewing, setReviewing] = useState(null);
   const [reason, setReason]       = useState('');
   const [actionError, setActionError] = useState('');
+  const [formResponses, setFormResponses] = useState({});
+  const [expandedForm, setExpandedForm]   = useState(null);
 
   useEffect(() => {
     fetchHodPendingApplications()
-      .then((res) => setApps(res.data))
+      .then((res) => {
+        setApps(res.data);
+        res.data.forEach((app) => {
+          fetchResponseByApplication(app.id)
+            .then((r) => setFormResponses((prev) => ({ ...prev, [app.id]: r.data })))
+            .catch(() => {});
+        });
+      })
       .catch(() => setError('Failed to load applications.'))
       .finally(() => setLoading(false));
   }, []);
@@ -46,24 +55,69 @@ export default function HodApplicationReview({ onBack }) {
       )}
 
       <div className="sv-list">
-        {apps.map((app) => (
-          <div key={app.id} className="sv-card">
-            <div className="sv-card-top">
-              <div>
-                <h3 className="sv-card-title">{app.idea_title}</h3>
-                <span className="sv-card-student">👤 {app.student_name}</span>
+        {apps.map((app) => {
+          const resp = formResponses[app.id];
+          const isExpanded = expandedForm === app.id;
+
+          return (
+            <div key={app.id} className="sv-card">
+              <div className="sv-card-top">
+                <div>
+                  <h3 className="sv-card-title">{app.idea_title}</h3>
+                  <span className="sv-card-student">👤 {app.student_name}</span>
+                </div>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  <span className="meta-tag">👨‍🏫 {app.doctor_name}</span>
+                  <span className="meta-tag">👥 {app.team_size} student{app.team_size > 1 ? 's' : ''}</span>
+                  <span className="meta-tag">🗓 {new Date(app.created_at).toLocaleDateString()}</span>
+                </div>
               </div>
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                <span className="meta-tag">👨‍🏫 {app.doctor_name}</span>
-                <span className="meta-tag">🗓 {new Date(app.created_at).toLocaleDateString()}</span>
+
+              {/* Team members */}
+              {app.invitations && app.invitations.length > 0 && (
+                <div className="sv-team-row">
+                  <span className="sv-team-label">Team:</span>
+                  {app.invitations.map((inv) => (
+                    <span key={inv.id} className={`sv-team-member sv-team-member--${inv.status}`}>
+                      {inv.invitee_name}
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              {/* Dynamic form responses */}
+              {resp && resp.field_responses && resp.field_responses.length > 0 && (
+                <div className="sv-form-section">
+                  <button
+                    className="sv-form-toggle"
+                    onClick={() => setExpandedForm(isExpanded ? null : app.id)}
+                    aria-expanded={isExpanded}
+                  >
+                    📋 Department Form Responses
+                    <span className="sv-form-toggle-arrow">{isExpanded ? '▲' : '▼'}</span>
+                  </button>
+                  {isExpanded && (
+                    <div className="sv-form-responses">
+                      {resp.field_responses.map((fr, idx) => (
+                        <div key={idx} className="sv-form-field">
+                          <span className="sv-form-field-label">{fr.field_label}</span>
+                          <span className="sv-form-field-value">
+                            {fr.value || <em className="sv-form-empty">—</em>}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <div className="sv-card-actions">
+                <button className="btn btn-primary" onClick={() => openReview(app.id, 'approve')}>✅ Register</button>
+                <button className="btn btn-danger"  onClick={() => openReview(app.id, 'reject')}>❌ Reject</button>
               </div>
             </div>
-            <div className="sv-card-actions">
-              <button className="btn btn-primary" onClick={() => openReview(app.id, 'approve')}>✅ Register</button>
-              <button className="btn btn-danger"  onClick={() => openReview(app.id, 'reject')}>❌ Reject</button>
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {reviewing && (

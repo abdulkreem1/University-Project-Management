@@ -3,6 +3,8 @@ import './RoleDashboard.css';
 import HodProposalReview from './HodProposalReview';
 import HodIdeaReview from './HodIdeaReview';
 import HodApplicationReview from './HodApplicationReview';
+import HodFormBuilder from './HodFormBuilder';
+import HodProjects from './HodProjects';
 
 const DEPT_LABELS = {
   software_engineering:    'Software Engineering',
@@ -20,6 +22,8 @@ const Icons = {
   ClipboardCheck: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/><polyline points="9 14 11 16 15 11"/></svg>,
   Inbox: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg>,
   BarChart: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/><line x1="6" y1="20" x2="6" y2="16"/></svg>,
+  Forms: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>,
+  Kanban: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="5" height="18" rx="1"/><rect x="10" y="3" width="5" height="12" rx="1"/><rect x="17" y="3" width="5" height="15" rx="1"/></svg>,
   ChevronRight: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
 };
 
@@ -29,6 +33,8 @@ const CARDS = [
   { icon: Icons.Lightbulb, label: 'Doctor Ideas',         desc: 'Review & approve doctor project ideas',    page: 'ideas' },
   { icon: Icons.ClipboardCheck, label: 'Student Proposals',    desc: 'Review & approve student proposals',       page: 'proposals' },
   { icon: Icons.Inbox, label: 'Idea Applications',    desc: 'Register student applications on ideas',   page: 'applications' },
+  { icon: Icons.Forms, label: 'Form Builder',          desc: 'Customize student submission forms',        page: 'formbuilder' },
+  { icon: Icons.Kanban, label: 'Active Projects',       desc: 'Monitor department project progress',       page: 'projects' },
   { icon: Icons.BarChart, label: 'Reports',              desc: 'Department statistics',                    page: null },
 ];
 
@@ -39,6 +45,8 @@ export default function HodDashboard({ user }) {
   if (page === 'ideas')        return <HodIdeaReview        onBack={() => setPage('dashboard')} />;
   if (page === 'proposals')    return <HodProposalReview    onBack={() => setPage('dashboard')} />;
   if (page === 'applications') return <HodApplicationReview onBack={() => setPage('dashboard')} />;
+  if (page === 'formbuilder')  return <HodFormBuilder       onBack={() => setPage('dashboard')} />;
+  if (page === 'projects')     return <HodProjects          onBack={() => setPage('dashboard')} user={user} />;
 
   return (
     <div className="premium-dashboard">

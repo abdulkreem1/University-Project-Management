@@ -1,19 +1,30 @@
 import React, { useState, useEffect } from 'react';
-import { fetchSupervisorPending, supervisorReview } from '../api';
+import { fetchSupervisorPending, supervisorReview, fetchResponseByProposal } from '../api';
 import './SupervisorReview.css';
 import './ProposeIdea.css'; /* reuse .btn-back */
 
 export default function SupervisorReview({ onBack }) {
-  const [proposals, setProposals] = useState([]);
-  const [loading, setLoading]     = useState(true);
-  const [error, setError]         = useState('');
-  const [reviewing, setReviewing] = useState(null); // { id, action }
-  const [reason, setReason]       = useState('');
+  const [proposals, setProposals]     = useState([]);
+  const [loading, setLoading]         = useState(true);
+  const [error, setError]             = useState('');
+  const [reviewing, setReviewing]     = useState(null); // { id, action }
+  const [reason, setReason]           = useState('');
   const [actionError, setActionError] = useState('');
+  // form responses keyed by proposal id
+  const [formResponses, setFormResponses] = useState({});
+  const [expandedForm, setExpandedForm]   = useState(null); // proposal id
 
   useEffect(() => {
     fetchSupervisorPending()
-      .then((res) => setProposals(res.data))
+      .then((res) => {
+        setProposals(res.data);
+        // fetch form response for each proposal in parallel
+        res.data.forEach((p) => {
+          fetchResponseByProposal(p.id)
+            .then((r) => setFormResponses((prev) => ({ ...prev, [p.id]: r.data })))
+            .catch(() => {}); // no form = silently ignore
+        });
+      })
       .catch(() => setError('Failed to load proposals.'))
       .finally(() => setLoading(false));
   }, []);
@@ -59,26 +70,71 @@ export default function SupervisorReview({ onBack }) {
       )}
 
       <div className="sv-list">
-        {proposals.map((p) => (
-          <div key={p.id} className="sv-card">
-            <div className="sv-card-top">
-              <div>
-                <h3 className="sv-card-title">{p.title}</h3>
-                <span className="sv-card-student">👤 {p.student_name}</span>
+        {proposals.map((p) => {
+          const resp = formResponses[p.id];
+          const isExpanded = expandedForm === p.id;
+
+          return (
+            <div key={p.id} className="sv-card">
+              <div className="sv-card-top">
+                <div>
+                  <h3 className="sv-card-title">{p.title}</h3>
+                  <span className="sv-card-student">👤 {p.student_name}</span>
+                </div>
+                <span className="meta-tag">🏛 {p.department.replace(/_/g, ' ')}</span>
               </div>
-              <span className="meta-tag">🏛 {p.department.replace(/_/g, ' ')}</span>
+              <p className="sv-card-desc">{p.description}</p>
+
+              {/* Team info */}
+              {p.invitations && p.invitations.length > 0 && (
+                <div className="sv-team-row">
+                  <span className="sv-team-label">Team:</span>
+                  {p.invitations.map((inv) => (
+                    <span key={inv.id} className={`sv-team-member sv-team-member--${inv.status}`}>
+                      {inv.invitee_name}
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              {/* Dynamic form response */}
+              {resp && resp.field_responses && resp.field_responses.length > 0 && (
+                <div className="sv-form-section">
+                  <button
+                    className="sv-form-toggle"
+                    onClick={() => setExpandedForm(isExpanded ? null : p.id)}
+                    aria-expanded={isExpanded}
+                  >
+                    📋 Department Form Responses
+                    <span className="sv-form-toggle-arrow">{isExpanded ? '▲' : '▼'}</span>
+                  </button>
+
+                  {isExpanded && (
+                    <div className="sv-form-responses">
+                      {resp.field_responses.map((fr, idx) => (
+                        <div key={idx} className="sv-form-field">
+                          <span className="sv-form-field-label">{fr.field_label}</span>
+                          <span className="sv-form-field-value">
+                            {fr.value || <em className="sv-form-empty">—</em>}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <div className="sv-card-actions">
+                <button className="btn btn-primary" onClick={() => openReview(p.id, 'approve')}>
+                  ✅ Approve
+                </button>
+                <button className="btn btn-danger" onClick={() => openReview(p.id, 'reject')}>
+                  ❌ Reject
+                </button>
+              </div>
             </div>
-            <p className="sv-card-desc">{p.description}</p>
-            <div className="sv-card-actions">
-              <button className="btn btn-primary" onClick={() => openReview(p.id, 'approve')}>
-                ✅ Approve
-              </button>
-              <button className="btn btn-danger" onClick={() => openReview(p.id, 'reject')}>
-                ❌ Reject
-              </button>
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* Confirm modal */}

@@ -10,6 +10,7 @@ import ImportUsers from './components/ImportUsers';
 import StudentDashboard from './components/StudentDashboard';
 import DoctorDashboard from './components/DoctorDashboard';
 import HodDashboard from './components/HodDashboard';
+import DeanDashboard from './components/DeanDashboard';
 import AssignHod from './components/AssignHod';
 import ChangePassword from './components/ChangePassword';
 
@@ -44,8 +45,10 @@ export default function App() {
   if (user.role === 'student') return <><Navbar user={user} onLogout={handleLogout} currentPage={page} /><StudentDashboard user={user} /></>;
   if (user.role === 'doctor')  return <><Navbar user={user} onLogout={handleLogout} currentPage={page} /><DoctorDashboard  user={user} /></>;
   if (user.role === 'hod')     return <><Navbar user={user} onLogout={handleLogout} currentPage={page} /><HodDashboard     user={user} /></>;
+  if (user.role === 'dean')    return <><Navbar user={user} onLogout={handleLogout} currentPage={page} /><DeanDashboard    user={user} /></>;
 
-  const canImport = ['dean', 'admin'].includes(user.role);
+  // Only dean has admin privileges (import users, assign HoD)
+  const canImport = user.role === 'dean';
 
   return (
     <div>

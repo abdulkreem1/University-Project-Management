@@ -269,3 +269,21 @@
   border-radius: 8px;
   margin-top: 16px;
 }
+
+/* ── Dynamic Form Section ── */
+.propose-dyn-section {
+  border-top: 1px solid var(--border, #e2e8f0);
+  padding-top: 20px;
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.propose-dyn-label {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted, #64748b);
+}

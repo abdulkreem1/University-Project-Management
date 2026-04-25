@@ -137,3 +137,74 @@ export const markNotifRead = (id) =>
 
 export const markAllNotifsRead = () =>
   api.post('/api/notifications/mark-all-read/');
+
+// ── Dynamic Forms ─────────────────────────────────────────────────────────────
+export const fetchHodForm = (context) =>
+  api.get(`/api/dy-forms/hod/${context}/`);
+
+export const saveHodForm = (context, data) =>
+  api.post(`/api/dy-forms/hod/${context}/save/`, data);
+
+export const fetchStudentForm = (department, context) =>
+  api.get(`/api/dy-forms/${department}/${context}/`);
+
+export const submitFormResponse = (data) =>
+  api.post('/api/dy-forms/responses/submit/', data);
+
+export const fetchHodFormResponses = (context) =>
+  api.get(`/api/dy-forms/hod/${context}/responses/`);
+
+export const fetchResponseByProposal = (proposalId) =>
+  api.get(`/api/dy-forms/responses/proposal/${proposalId}/`);
+
+export const fetchResponseByApplication = (applicationId) =>
+  api.get(`/api/dy-forms/responses/application/${applicationId}/`);
+
+// ── Project Management (Kanban Board) ─────────────────────────────────────────
+export const fetchMyBoard = () =>
+  api.get('/api/project-management/board/');
+
+export const fetchSupervisorBoards = () =>
+  api.get('/api/project-management/supervisor/boards/');
+
+export const createTask = (boardId, data) =>
+  api.post(`/api/project-management/board/${boardId}/tasks/`, data);
+
+export const updateTask = (boardId, taskId, data) =>
+  api.patch(`/api/project-management/board/${boardId}/tasks/${taskId}/`, data);
+
+export const deleteTask = (boardId, taskId) =>
+  api.delete(`/api/project-management/board/${boardId}/tasks/${taskId}/delete/`);
+
+// ── Task Comments ──────────────────────────────────────────────────────────────
+export const fetchComments = (boardId, taskId) =>
+  api.get(`/api/project-management/board/${boardId}/tasks/${taskId}/comments/`);
+
+export const postComment = (boardId, taskId, body) =>
+  api.post(`/api/project-management/board/${boardId}/tasks/${taskId}/comments/`, { body });
+
+export const deleteComment = (boardId, taskId, commentId) =>
+  api.delete(`/api/project-management/board/${boardId}/tasks/${taskId}/comments/${commentId}/delete/`);
+
+// ── Task Attachments ───────────────────────────────────────────────────────────
+export const uploadAttachment = (boardId, taskId, file) => {
+  const form = new FormData();
+  form.append('file', file);
+  return api.post(`/api/project-management/board/${boardId}/tasks/${taskId}/attachments/`, form, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+};
+
+export const deleteAttachment = (boardId, taskId, attachmentId) =>
+  api.delete(`/api/project-management/board/${boardId}/tasks/${taskId}/attachments/${attachmentId}/delete/`);
+
+// ── Board Activity ─────────────────────────────────────────────────────────────
+export const fetchBoardActivity = (boardId) =>
+  api.get(`/api/project-management/board/${boardId}/activity/`);
+
+// ── HoD & Dean ─────────────────────────────────────────────────────────────────
+export const fetchHodBoards = () =>
+  api.get('/api/project-management/hod/boards/');
+
+export const fetchHodStats = () =>
+  api.get('/api/project-management/hod/stats/');
