@@ -1,0 +1,452 @@
+.pwv-container {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+.pwv-loading,
+.pwv-error-state {
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--text-secondary, #64748b);
+}
+
+.pwv-error-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.pwv-error-state svg {
+  width: 48px;
+  height: 48px;
+  color: #f59e0b;
+}
+
+.pwv-header {
+  margin-bottom: 24px;
+}
+
+.pwv-header h2 {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--text-primary, #1e293b);
+  margin: 0 0 8px;
+}
+
+.pwv-subtitle {
+  font-size: 16px;
+  color: var(--text-secondary, #64748b);
+  margin: 0;
+}
+
+.pwv-back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: transparent;
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 8px;
+  font-size: 14px;
+  color: var(--text-secondary, #64748b);
+  cursor: pointer;
+  margin-bottom: 16px;
+  transition: all 0.15s;
+}
+
+.pwv-back-btn:hover {
+  background: var(--bg-secondary, #f8fafc);
+  border-color: var(--primary, #6366f1);
+  color: var(--primary, #6366f1);
+}
+
+.pwv-stage-desc {
+  font-size: 15px;
+  color: var(--text-secondary, #64748b);
+  margin-bottom: 24px;
+  padding: 16px;
+  background: var(--bg-secondary, #f8fafc);
+  border-radius: 8px;
+}
+
+.pwv-description {
+  padding: 16px 20px;
+  background: var(--bg-secondary, #f8fafc);
+  border-left: 4px solid var(--primary, #6366f1);
+  border-radius: 8px;
+  margin-bottom: 24px;
+  font-size: 14px;
+  color: var(--text-secondary, #64748b);
+}
+
+.pwv-progress-section {
+  background: #fff;
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 24px;
+}
+
+.pwv-progress-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary, #1e293b);
+}
+
+.pwv-progress-bar {
+  height: 12px;
+  background: var(--bg-secondary, #f1f5f9);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.pwv-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--primary, #6366f1), #8b5cf6);
+  border-radius: 6px;
+  transition: width 0.3s ease;
+}
+
+.pwv-stages-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.pwv-stage-card {
+  display: flex;
+  gap: 16px;
+  background: #fff;
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 12px;
+  padding: 20px;
+  transition: box-shadow 0.15s;
+}
+
+.pwv-stage-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.pwv-stage-number {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  background: var(--primary, #6366f1);
+  color: #fff;
+  border-radius: 50%;
+  font-size: 18px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.pwv-stage-content {
+  flex: 1;
+}
+
+.pwv-stage-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.pwv-stage-header h4 {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-primary, #1e293b);
+  margin: 0;
+}
+
+.pwv-status-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 16px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.pwv-status-pending {
+  background: #fef3c7;
+  color: #d97706;
+}
+
+.pwv-status-progress {
+  background: #dbeafe;
+  color: #2563eb;
+}
+
+.pwv-status-submitted {
+  background: #e0e7ff;
+  color: #6366f1;
+}
+
+.pwv-status-approved {
+  background: #dcfce7;
+  color: #16a34a;
+}
+
+.pwv-status-rejected {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.pwv-status-overdue {
+  background: #fef2f2;
+  color: #ef4444;
+}
+
+.pwv-stage-text {
+  font-size: 14px;
+  color: var(--text-secondary, #64748b);
+  margin: 0 0 12px;
+  line-height: 1.6;
+}
+
+.pwv-stage-meta {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+.pwv-meta-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text-secondary, #64748b);
+}
+
+.pwv-required {
+  padding: 4px 8px;
+  background: #fef3c7;
+  color: #d97706;
+  border-radius: 4px;
+  font-weight: 600;
+}
+
+.pwv-submission-info {
+  padding: 10px 12px;
+  background: var(--bg-secondary, #f8fafc);
+  border-radius: 6px;
+  font-size: 13px;
+  color: var(--text-secondary, #64748b);
+  margin-bottom: 12px;
+}
+
+.pwv-feedback {
+  padding: 12px;
+  background: #fef3c7;
+  border-left: 3px solid #f59e0b;
+  border-radius: 6px;
+  font-size: 14px;
+  color: var(--text-primary, #1e293b);
+  margin-bottom: 12px;
+}
+
+.pwv-feedback strong {
+  color: #d97706;
+}
+
+.pwv-submit-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  background: var(--primary, #6366f1);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.pwv-submit-btn:hover {
+  opacity: 0.9;
+}
+
+.pwv-no-form {
+  text-align: center;
+  padding: 40px 20px;
+  background: var(--bg-secondary, #f8fafc);
+  border-radius: 8px;
+  color: var(--text-secondary, #64748b);
+}
+
+.pwv-error {
+  padding: 12px 16px;
+  background: #fee2e2;
+  border-radius: 8px;
+  color: #dc2626;
+  font-size: 14px;
+  margin-top: 16px;
+}
+
+
+/* Form Styles */
+.pwv-form {
+  background: #fff;
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 12px;
+  padding: 24px;
+  margin-top: 20px;
+}
+
+.pwv-form-field {
+  margin-bottom: 20px;
+}
+
+.pwv-form-label {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary, #1e293b);
+  margin-bottom: 8px;
+}
+
+.pwv-required {
+  color: #ef4444;
+  margin-left: 4px;
+}
+
+.pwv-form-input,
+.pwv-form-textarea,
+.pwv-form-select,
+.pwv-form-file {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 8px;
+  font-size: 14px;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.pwv-form-input:focus,
+.pwv-form-textarea:focus,
+.pwv-form-select:focus {
+  border-color: var(--primary, #6366f1);
+}
+
+.pwv-form-textarea {
+  resize: vertical;
+}
+
+.pwv-form-radio-group,
+.pwv-form-checkbox-group {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.pwv-form-radio-label,
+.pwv-form-checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--text-primary, #1e293b);
+  cursor: pointer;
+}
+
+.pwv-form-radio-label input,
+.pwv-form-checkbox-label input {
+  cursor: pointer;
+}
+
+.pwv-form-error {
+  padding: 12px 16px;
+  background: #fee2e2;
+  border-radius: 8px;
+  color: #dc2626;
+  font-size: 14px;
+  margin-bottom: 16px;
+}
+
+.pwv-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border, #e2e8f0);
+}
+
+.pwv-btn-cancel {
+  padding: 10px 24px;
+  background: transparent;
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-secondary, #64748b);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.pwv-btn-cancel:hover {
+  background: var(--bg-secondary, #f8fafc);
+  border-color: var(--text-secondary, #64748b);
+}
+
+.pwv-btn-submit {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 24px;
+  background: var(--primary, #6366f1);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.pwv-btn-submit:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.pwv-btn-submit:hover:not(:disabled) {
+  opacity: 0.9;
+}
+
+.pwv-no-fields {
+  padding: 16px;
+  background: var(--bg-secondary, #f8fafc);
+  border-radius: 8px;
+  text-align: center;
+  color: var(--text-secondary, #64748b);
+  font-size: 14px;
+}
+
+.pwv-back-btn {
+  padding: 8px 16px;
+  background: transparent;
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 8px;
+  font-size: 14px;
+  color: var(--text-secondary, #64748b);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.pwv-back-btn:hover {
+  background: var(--bg-secondary, #f8fafc);
+  border-color: var(--primary, #6366f1);
+  color: var(--primary, #6366f1);
+}

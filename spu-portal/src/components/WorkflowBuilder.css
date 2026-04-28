@@ -1,0 +1,545 @@
+.wb-container {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+.wb-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.wb-back-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: transparent;
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 8px;
+  font-size: 14px;
+  color: var(--text-secondary, #64748b);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.wb-back-btn:hover {
+  background: var(--bg-secondary, #f8fafc);
+  border-color: var(--primary, #6366f1);
+  color: var(--primary, #6366f1);
+}
+
+.wb-title {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--text-primary, #1e293b);
+  margin: 0;
+}
+
+.wb-new-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  background: var(--primary, #6366f1);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  margin-bottom: 20px;
+  transition: opacity 0.15s;
+}
+
+.wb-new-btn:hover {
+  opacity: 0.9;
+}
+
+.wb-loading,
+.wb-empty {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--text-secondary, #64748b);
+}
+
+.wb-empty p {
+  margin: 8px 0;
+}
+
+.wb-templates-list {
+  display: grid;
+  gap: 16px;
+}
+
+.wb-template-card {
+  background: #fff;
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 12px;
+  padding: 20px;
+  transition: box-shadow 0.15s;
+}
+
+.wb-template-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.wb-template-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.wb-template-header h3 {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-primary, #1e293b);
+  margin: 0;
+}
+
+.wb-template-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.wb-icon-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background: transparent;
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s;
+  color: var(--text-secondary, #64748b);
+}
+
+.wb-icon-btn:hover {
+  background: var(--bg-secondary, #f8fafc);
+  border-color: var(--primary, #6366f1);
+  color: var(--primary, #6366f1);
+}
+
+.wb-icon-btn-danger:hover {
+  border-color: #ef4444;
+  color: #ef4444;
+}
+
+.wb-template-desc {
+  font-size: 14px;
+  color: var(--text-secondary, #64748b);
+  margin: 0 0 12px;
+}
+
+.wb-template-meta {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  font-size: 13px;
+  color: var(--text-secondary, #64748b);
+}
+
+.wb-template-meta span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.wb-status-badge {
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.wb-status-active {
+  background: #dcfce7;
+  color: #16a34a;
+}
+
+.wb-status-inactive {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.wb-form {
+  background: #fff;
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 12px;
+  padding: 24px;
+}
+
+.wb-form-group {
+  margin-bottom: 20px;
+}
+
+.wb-label {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary, #1e293b);
+  margin-bottom: 8px;
+}
+
+.wb-label-small {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary, #64748b);
+}
+
+.wb-input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 8px;
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.wb-input:focus {
+  border-color: var(--primary, #6366f1);
+}
+
+.wb-input-sm {
+  width: 100px;
+}
+
+.wb-textarea {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 8px;
+  font-size: 14px;
+  font-family: inherit;
+  resize: vertical;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.wb-textarea:focus {
+  border-color: var(--primary, #6366f1);
+}
+
+.wb-textarea-small {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 6px;
+  font-size: 13px;
+  font-family: inherit;
+  resize: vertical;
+  outline: none;
+}
+
+.wb-select {
+  padding: 10px 12px;
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 8px;
+  font-size: 14px;
+  background: #fff;
+  outline: none;
+  cursor: pointer;
+}
+
+.wb-select:focus {
+  border-color: var(--primary, #6366f1);
+}
+
+.wb-stages-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin: 32px 0 16px;
+}
+
+.wb-stages-header h3 {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-primary, #1e293b);
+  margin: 0;
+}
+
+.wb-add-stage-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  background: transparent;
+  border: 1px solid var(--primary, #6366f1);
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--primary, #6366f1);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.wb-add-stage-btn:hover {
+  background: var(--primary, #6366f1);
+  color: #fff;
+}
+
+.wb-empty-stages {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--text-secondary, #64748b);
+  background: var(--bg-secondary, #f8fafc);
+  border-radius: 8px;
+  margin-bottom: 20px;
+}
+
+.wb-stages-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.wb-stage-card {
+  display: flex;
+  gap: 12px;
+  background: var(--bg-secondary, #f8fafc);
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 10px;
+  padding: 16px;
+  transition: box-shadow 0.15s;
+}
+
+.wb-stage-card:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.wb-stage-drag {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  color: var(--text-secondary, #64748b);
+  cursor: grab;
+}
+
+.wb-stage-drag:active {
+  cursor: grabbing;
+}
+
+.wb-stage-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.wb-stage-row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.wb-checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--text-primary, #1e293b);
+  cursor: pointer;
+}
+
+.wb-notify-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.wb-remove-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background: transparent;
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 6px;
+  color: var(--text-secondary, #64748b);
+  cursor: pointer;
+  transition: all 0.15s;
+  align-self: flex-start;
+}
+
+.wb-remove-btn:hover {
+  border-color: #ef4444;
+  color: #ef4444;
+  background: #fef2f2;
+}
+
+.wb-error {
+  padding: 12px 16px;
+  background: #fee2e2;
+  border-radius: 8px;
+  color: #dc2626;
+  font-size: 14px;
+  margin-bottom: 16px;
+}
+
+.wb-footer {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 20px;
+  border-top: 1px solid var(--border, #e2e8f0);
+}
+
+.wb-save-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 28px;
+  background: var(--primary, #6366f1);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.wb-save-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.wb-save-btn:hover:not(:disabled) {
+  opacity: 0.9;
+}
+
+/* Fields Section */
+.wb-fields-section {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border, #e2e8f0);
+}
+
+.wb-fields-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.wb-fields-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  background: transparent;
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary, #1e293b);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.wb-fields-toggle:hover {
+  background: #fff;
+  border-color: var(--primary, #6366f1);
+}
+
+.wb-add-field-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: transparent;
+  border: 1px solid var(--primary, #6366f1);
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--primary, #6366f1);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.wb-add-field-btn:hover {
+  background: var(--primary, #6366f1);
+  color: #fff;
+}
+
+.wb-fields-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.wb-empty-fields {
+  text-align: center;
+  padding: 24px 16px;
+  color: var(--text-secondary, #64748b);
+  background: #fff;
+  border-radius: 6px;
+  font-size: 13px;
+}
+
+.wb-field-card {
+  display: flex;
+  gap: 10px;
+  background: #fff;
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 8px;
+  padding: 12px;
+  transition: box-shadow 0.15s;
+}
+
+.wb-field-card:hover {
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
+}
+
+.wb-field-drag {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  color: var(--text-secondary, #64748b);
+  cursor: grab;
+}
+
+.wb-field-drag:active {
+  cursor: grabbing;
+}
+
+.wb-field-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.wb-field-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.wb-select-sm {
+  width: 150px;
+}
+
+.wb-options-area {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.wb-options-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary, #64748b);
+}

@@ -2,6 +2,7 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from django.db import transaction
+from django.db.models import Q
 
 from accounts.models import User
 from .permissions import IsDoctor, IsStudent, IsHod
@@ -25,6 +26,14 @@ from .services import (
     replace_proposal_member, replace_application_member,
 )
 from .models import StudentIdeaProposal, ProjectIdea, IdeaApplication, TeamInvitation, ProposalInvitation
+
+
+MAX_STUDENT_SEARCH_RESULTS = 20
+MIN_STUDENT_SEARCH_CHARS = 2
+
+
+def _validation_error_response(errors):
+    return Response({'error': 'Validation failed.', 'details': errors}, status=400)
 
 # helper to save dynamic form response inside an existing transaction
 def _save_form_response(student, form_id, field_responses, proposal_id=None, application_id=None):
@@ -54,7 +63,7 @@ def _save_form_response(student, form_id, field_responses, proposal_id=None, app
 def submit_idea(request):
     serializer = ProjectIdeaSerializer(data=request.data)
     if not serializer.is_valid():
-        return Response(serializer.errors, status=400)
+        return _validation_error_response(serializer.errors)
     result = create_project_idea(doctor=request.user, **serializer.validated_data)
     return Response(
         {'message': 'Idea submitted successfully.', 'idea': ProjectIdeaSerializer(result['idea']).data},
@@ -76,7 +85,7 @@ def my_ideas(request):
 def propose_idea(request):
     serializer = StudentIdeaProposalSerializer(data=request.data)
     if not serializer.is_valid():
-        return Response(serializer.errors, status=400)
+        return _validation_error_response(serializer.errors)
 
     team_size        = int(request.data.get('team_size', 1))
     team_size_reason = request.data.get('team_size_reason', '').strip()
@@ -155,12 +164,14 @@ def list_doctors_for_student(request):
 def list_students_for_team(request):
     """Return all students (except self) for team member search."""
     q = request.query_params.get('q', '').strip()
-    qs = User.objects.filter(role='student').exclude(pk=request.user.pk)
-    if q:
-        qs = qs.filter(username__icontains=q) | User.objects.filter(
-            role='student', first_name__icontains=q
-        ).exclude(pk=request.user.pk)
-    qs = qs.values('username', 'first_name', 'last_name')[:20]
+    if len(q) < MIN_STUDENT_SEARCH_CHARS:
+        return Response([])
+
+    qs = User.objects.filter(role='student').exclude(pk=request.user.pk).filter(
+        Q(username__icontains=q) |
+        Q(first_name__icontains=q) |
+        Q(last_name__icontains=q)
+    ).values('username', 'first_name', 'last_name')[:MAX_STUDENT_SEARCH_RESULTS]
     result = [
         {
             'username': s['username'],
@@ -191,7 +202,7 @@ def supervisor_review(request, proposal_id):
 
     serializer = ProposalReviewSerializer(data=request.data)
     if not serializer.is_valid():
-        return Response(serializer.errors, status=400)
+        return _validation_error_response(serializer.errors)
 
     result = supervisor_review_proposal(
         proposal=proposal,
@@ -222,7 +233,7 @@ def hod_review(request, proposal_id):
 
     serializer = ProposalReviewSerializer(data=request.data)
     if not serializer.is_valid():
-        return Response(serializer.errors, status=400)
+        return _validation_error_response(serializer.errors)
 
     result = hod_review_proposal(
         proposal=proposal,
@@ -253,7 +264,7 @@ def hod_review_idea(request, idea_id):
 
     serializer = ProposalReviewSerializer(data=request.data)
     if not serializer.is_valid():
-        return Response(serializer.errors, status=400)
+        return _validation_error_response(serializer.errors)
 
     result = hod_review_doctor_idea(
         idea=idea,
@@ -331,7 +342,7 @@ def doctor_review_app(request, app_id):
 
     serializer = ProposalReviewSerializer(data=request.data)
     if not serializer.is_valid():
-        return Response(serializer.errors, status=400)
+        return _validation_error_response(serializer.errors)
 
     result = doctor_review_application(
         application=app,
@@ -362,7 +373,7 @@ def hod_review_app(request, app_id):
 
     serializer = ProposalReviewSerializer(data=request.data)
     if not serializer.is_valid():
-        return Response(serializer.errors, status=400)
+        return _validation_error_response(serializer.errors)
 
     result = hod_review_application(
         application=app,

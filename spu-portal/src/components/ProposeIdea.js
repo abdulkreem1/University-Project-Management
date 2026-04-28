@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { submitStudentProposal, fetchMyProposal, fetchDoctorsList, fetchStudentForm } from '../api';
 import StudentSearch from './StudentSearch';
+import DynamicCheckboxGroup from './DynamicCheckboxGroup';
 import './ProposeIdea.css';
 
 const DEPARTMENTS = [
@@ -32,7 +33,9 @@ const STATUS_META = {
 };
 
 const EMPTY = { title: '', description: '', department: '', supervisor: '',
-                team_size: 2, team_size_reason: '', member_ids: [''] };
+                team_size: 2, member_ids: [''] };
+
+const emptyValueForField = (field) => field.field_type === 'checkbox' ? [] : '';
 
 export default function ProposeIdea({ onBack }) {
   const [existing, setExisting]     = useState(undefined);
@@ -64,7 +67,7 @@ export default function ProposeIdea({ onBack }) {
       .then(res => {
         setDynForm(res.data?.fields?.length ? res.data : null);
         const init = {};
-        (res.data?.fields || []).forEach(f => { init[f.id] = ''; });
+        (res.data?.fields || []).forEach(f => { init[f.id] = emptyValueForField(f); });
         setDynValues(init);
       })
       .catch(() => setDynForm(null));
@@ -77,13 +80,11 @@ export default function ProposeIdea({ onBack }) {
 
   const handleTeamSizeChange = (size) => {
     const s = Number(size);
-    // Standard sizes 2-3 need member fields; others just need a reason
-    const memberCount = (s >= 2 && s <= 3) ? s - 1 : 0;
+    const memberCount = s - 1;
     setForm((prev) => ({
       ...prev,
       team_size: s,
       member_ids: Array(memberCount).fill(''),
-      team_size_reason: (s < 2 || s > 3) ? prev.team_size_reason : '',
     }));
   };
 
@@ -94,8 +95,6 @@ export default function ProposeIdea({ onBack }) {
       return { ...prev, member_ids: ids };
     });
   };
-
-  const needsReason = form.team_size < 2 || form.team_size > 3;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -108,12 +107,11 @@ export default function ProposeIdea({ onBack }) {
         department:       form.department,
         supervisor:       Number(form.supervisor),
         team_size:        Number(form.team_size),
-        team_size_reason: form.team_size_reason,
         member_ids:       form.member_ids.filter(Boolean),
         // dynamic form fields sent together in the same request
         form_id:          dynForm?.id || null,
         field_responses:  dynForm
-          ? (dynForm.fields || []).map(f => ({ field: f.id, value: dynValues[f.id] || '' }))
+          ? (dynForm.fields || []).map(f => ({ field: f.id, value: dynValues[f.id] ?? emptyValueForField(f) }))
           : [],
       });
       setExisting(res.data.proposal);
@@ -242,7 +240,7 @@ export default function ProposeIdea({ onBack }) {
 
       <div className="alert-strip alert-info-strip compact">
         <span className="alert-icon">{Icons.Info}</span>
-        <span>Standard team size is <strong>2–3 students</strong>. Other sizes require a detailed justification.</span>
+        <span>Team size for student proposals is <strong>2–3 students</strong>.</span>
       </div>
 
       <div className="propose-card">
@@ -306,28 +304,13 @@ export default function ProposeIdea({ onBack }) {
                 <select id="p-team" className="form-control"
                   value={form.team_size}
                   onChange={(e) => handleTeamSizeChange(e.target.value)}>
-                  {[1, 2, 3, 4].map((n) => (
+                  {[2, 3].map((n) => (
                     <option key={n} value={n}>{n} student{n > 1 ? 's' : ''}</option>
                   ))}
                 </select>
               </div>
             </div>
           </div>
-
-          {/* Reason for non-standard size */}
-          {needsReason && (
-            <div className="form-group justification-group">
-              <label htmlFor="p-reason">
-                Justification for {form.team_size === 1 ? 'Solo' : `${form.team_size}-Student`} Team
-              </label>
-              <textarea id="p-reason" name="team_size_reason" rows={3} className="form-control"
-                value={form.team_size_reason} onChange={handleChange}
-                placeholder={form.team_size < 2
-                  ? 'Explain why you are working alone…'
-                  : 'Explain why your team needs more than 3 members…'}
-                required />
-            </div>
-          )}
 
           {/* Member fields for standard sizes */}
           {form.member_ids.map((val, idx) => (
@@ -352,7 +335,7 @@ export default function ProposeIdea({ onBack }) {
                 <ProposeDynField
                   key={field.id}
                   field={field}
-                  value={dynValues[field.id] || ''}
+                  value={dynValues[field.id] ?? emptyValueForField(field)}
                   onChange={val => setDynValues(prev => ({ ...prev, [field.id]: val }))}
                 />
               ))}
@@ -389,7 +372,7 @@ function ProposeDynField({ field, value, onChange }) {
   if (field_type === 'radio')
     return <div className="form-group">{lbl}<div style={{display:'flex',flexDirection:'column',gap:6}}>{(options||[]).map(o=><label key={o} style={{display:'flex',alignItems:'center',gap:8,fontSize:14}}><input type="radio" name={`dyn-${field.id}`} value={o} checked={value===o} onChange={()=>onChange(o)} required={required}/>{o}</label>)}</div></div>;
   if (field_type === 'checkbox')
-    return <div className="form-group">{lbl}<div style={{display:'flex',flexDirection:'column',gap:6}}>{(options||[]).map(o=>{const checked=(value||'').split(',').includes(o);const toggle=()=>{const cur=value?value.split(',').filter(Boolean):[];onChange(checked?cur.filter(v=>v!==o).join(','):[...cur,o].join(','))};return<label key={o} style={{display:'flex',alignItems:'center',gap:8,fontSize:14}}><input type="checkbox" checked={checked} onChange={toggle}/>{o}</label>;})}</div></div>;
+    return <div className="form-group">{lbl}<DynamicCheckboxGroup field={field} value={value} onChange={onChange} /></div>;
   if (field_type === 'file')
     return <div className="form-group">{lbl}<input className="form-control" type="file" required={required} accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.gif" onChange={e=>{const file=e.target.files?.[0];if(file)onChange(file.name);}}/><small style={{fontSize:12,color:'#64748b',marginTop:4,display:'block'}}>Upload a file (PDF, DOC, or image)</small></div>;
   return null;

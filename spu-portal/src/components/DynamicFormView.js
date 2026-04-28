@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { fetchStudentForm, submitFormResponse } from '../api';
+import DynamicCheckboxGroup from './DynamicCheckboxGroup';
 import './DynamicFormView.css';
 
 const DEPARTMENTS = [
@@ -9,6 +10,9 @@ const DEPARTMENTS = [
   { value: 'communications',          label: 'Communications' },
   { value: 'control_robotics',        label: 'Control & Robotics' },
 ];
+
+const emptyValueForField = (field) => field.field_type === 'checkbox' ? [] : '';
+const isEmptyFieldValue = (value) => Array.isArray(value) ? value.length === 0 : !value;
 
 /**
  * Renders the full form for a student:
@@ -51,7 +55,7 @@ export default function DynamicFormView({
         setDynForm(res.data);
         // Init dynamic values
         const init = {};
-        (res.data.fields || []).forEach(f => { init[f.id] = ''; });
+        (res.data.fields || []).forEach(f => { init[f.id] = emptyValueForField(f); });
         setDynValues(init);
       })
       .catch(() => setDynForm(null))
@@ -69,7 +73,7 @@ export default function DynamicFormView({
     // Validate required dynamic fields
     if (dynForm) {
       for (const f of dynForm.fields || []) {
-        if (f.required && !dynValues[f.id]) {
+        if (f.required && isEmptyFieldValue(dynValues[f.id])) {
           setError(`"${f.label}" is required.`);
           return;
         }
@@ -78,7 +82,7 @@ export default function DynamicFormView({
 
     const defaultValues = { title, description, department, team_size: teamSize };
     const dynamicValues = dynForm
-      ? (dynForm.fields || []).map(f => ({ field: f.id, value: dynValues[f.id] || '' }))
+      ? (dynForm.fields || []).map(f => ({ field: f.id, value: dynValues[f.id] ?? emptyValueForField(f) }))
       : [];
 
     onSubmit(defaultValues, dynamicValues, dynForm?.id || null);
@@ -161,7 +165,7 @@ export default function DynamicFormView({
             <DynField
               key={field.id}
               field={field}
-              value={dynValues[field.id] || ''}
+              value={dynValues[field.id] ?? emptyValueForField(field)}
               onChange={val => handleDynChange(field.id, val)}
             />
           ))}
@@ -256,22 +260,7 @@ function DynField({ field, value, onChange }) {
   if (field_type === 'checkbox') return (
     <div className="dfv-field">
       {labelEl}
-      <div className="dfv-checkbox-group">
-        {(options || []).map(opt => {
-          const checked = (value || '').split(',').includes(opt);
-          const toggle = () => {
-            const current = value ? value.split(',').filter(Boolean) : [];
-            const next = checked ? current.filter(v => v !== opt) : [...current, opt];
-            onChange(next.join(','));
-          };
-          return (
-            <label key={opt} className="dfv-checkbox-label">
-              <input type="checkbox" checked={checked} onChange={toggle} />
-              {opt}
-            </label>
-          );
-        })}
-      </div>
+      <DynamicCheckboxGroup field={field} value={value} onChange={onChange} />
     </div>
   );
 

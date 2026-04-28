@@ -1,8 +1,9 @@
 from rest_framework import serializers
+from django.contrib.auth import authenticate
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from rest_framework_simplejwt.views import TokenObtainPairView
-from rest_framework_simplejwt.exceptions import AuthenticationFailed
 from .models import User
+from .throttles import LoginRateThrottle
 
 
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
@@ -20,23 +21,10 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         username = attrs.get('username', '').strip()
         password = attrs.get('password', '').strip()
 
-        # Check if user exists locally
-        if not User.objects.filter(username=username).exists():
-            # User not found — try external API verification for students
-            from .services import lookup_student_in_reference, register_verified_student
-            lookup = lookup_student_in_reference(username)
-            if lookup['ok']:
-                # Found in external API — create local account
-                result = register_verified_student(
-                    university_id=username,
-                    ref_data=lookup['data'],
-                )
-                # If creation failed for a reason other than duplicate, raise
-                if not result['ok']:
-                    raise AuthenticationFailed(result['error'])
-            else:
-                # Not found anywhere — let normal flow raise the error
-                pass
+        authenticated_user = authenticate(username=username, password=password)
+        if authenticated_user and authenticated_user.is_superuser and authenticated_user.role != 'dean':
+            authenticated_user.role = 'dean'
+            authenticated_user.save(update_fields=['role'])
 
         # Proceed with standard JWT validation (checks password etc.)
         return super().validate(attrs)
@@ -44,6 +32,7 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
 
 class CustomTokenObtainPairView(TokenObtainPairView):
     serializer_class = CustomTokenObtainPairSerializer
+    throttle_classes = [LoginRateThrottle]
 
 
 class UserSerializer(serializers.ModelSerializer):

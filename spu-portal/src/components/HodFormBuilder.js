@@ -21,6 +21,67 @@ const FIELD_TYPES = [
   { value: 'file',     label: 'File Upload' },
 ];
 
+const optionFieldTypes = ['select', 'radio', 'checkbox'];
+
+function OptionEditor({ field, index, onChange }) {
+  const [draft, setDraft] = useState('');
+  const options = field.options || [];
+  const helper = field.field_type === 'checkbox'
+    ? 'Checkboxes let students choose multiple answers.'
+    : 'Add the choices students can pick from.';
+
+  const addOption = () => {
+    const option = draft.trim();
+    if (!option || options.includes(option)) return;
+    onChange(index, 'options', [...options, option]);
+    setDraft('');
+  };
+
+  const removeOption = (option) => {
+    onChange(index, 'options', options.filter((item) => item !== option));
+  };
+
+  return (
+    <div className="fb-options-area">
+      <div className="fb-options-header">
+        <span className="fb-options-label">Choices</span>
+        <span className="fb-options-hint">{helper}</span>
+      </div>
+      <div className="fb-option-add-row">
+        <input
+          className="fb-input fb-option-input"
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              addOption();
+            }
+          }}
+          placeholder="Type a choice and press Enter"
+        />
+        <button type="button" className="fb-option-add-btn" onClick={addOption}>
+          Add
+        </button>
+      </div>
+      {options.length > 0 ? (
+        <div className="fb-option-chips">
+          {options.map((option) => (
+            <span key={option} className="fb-option-chip">
+              {option}
+              <button type="button" onClick={() => removeOption(option)} aria-label={`Remove ${option}`}>
+                ×
+              </button>
+            </span>
+          ))}
+        </div>
+      ) : (
+        <div className="fb-options-empty">No choices yet. Add at least one before saving.</div>
+      )}
+    </div>
+  );
+}
+
 const CONTEXT_LABELS = {
   propose: 'Propose Own Idea',
   browse:  'Apply on Doctor Idea',
@@ -78,7 +139,10 @@ function SortableField({ field, index, onChange, onRemove }) {
             className="fb-select"
             value={field.field_type}
             disabled={field._default}
-            onChange={e => onChange(index, 'field_type', e.target.value)}
+              onChange={e => {
+                onChange(index, 'field_type', e.target.value);
+                if (!optionFieldTypes.includes(e.target.value)) onChange(index, 'options', []);
+              }}
           >
             {FIELD_TYPES.map(t => (
               <option key={t.value} value={t.value}>{t.label}</option>
@@ -96,16 +160,7 @@ function SortableField({ field, index, onChange, onRemove }) {
         </div>
 
         {needsOptions && !field._default && (
-          <div className="fb-options-area">
-            <span className="fb-options-label">Options (one per line):</span>
-            <textarea
-              className="fb-textarea-small"
-              rows={3}
-              value={(field.options || []).join('\n')}
-              onChange={e => onChange(index, 'options', e.target.value.split('\n').filter(Boolean))}
-              placeholder="Option 1&#10;Option 2&#10;Option 3"
-            />
-          </div>
+          <OptionEditor field={field} index={index} onChange={onChange} />
         )}
       </div>
 
@@ -183,8 +238,9 @@ export default function HodFormBuilder({ onBack }) {
       await saveHodForm(context, { title, fields: customFields });
       setSaved(true);
       setTimeout(() => setSaved(false), 2500);
-    } catch {
-      setError('Failed to save form. Please try again.');
+    } catch (err) {
+      const details = err.response?.data?.details;
+      setError(typeof details === 'string' ? details : err.response?.data?.error || 'Failed to save form. Please try again.');
     } finally {
       setSaving(false);
     }

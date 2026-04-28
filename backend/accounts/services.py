@@ -1,17 +1,29 @@
+import logging
+import os
+
+import requests
+from django.db import transaction
 from django.contrib.auth.hashers import make_password
 from .models import User, DEPARTMENTS
-from .selectors import user_exists, get_hod_by_department
+from .selectors import user_exists
 
 
 VALID_DEPARTMENTS = [d[0] for d in DEPARTMENTS]
+logger = logging.getLogger(__name__)
 
 
 def create_user_from_import(*, username: str, email: str, role: str, password: str) -> User | None:
+    username = str(username or '').strip()
+    if not username:
+        return None
+
+    normalized_email = '' if email is None else str(email).strip()
+
     if user_exists(username):
         return None
     return User.objects.create(
         username=username,
-        email=email,
+        email=normalized_email,
         role=role,
         password=make_password(password),
         must_change_password=True,
@@ -35,39 +47,52 @@ def assign_hod(*, doctor_id: int, department: str) -> dict:
     if department not in VALID_DEPARTMENTS:
         return {'ok': False, 'error': 'Invalid department.'}
     try:
-        doctor = User.objects.get(id=doctor_id, role__in=['doctor', 'hod'])
+        with transaction.atomic():
+            doctor = User.objects.select_for_update().get(id=doctor_id, role__in=['doctor', 'hod'])
+            current_hod = (
+                User.objects.select_for_update()
+                .filter(role='hod', department=department)
+                .first()
+            )
+
+            if current_hod and current_hod.id != doctor.id:
+                current_hod.role = 'doctor'
+                current_hod.department = None
+                current_hod.save(update_fields=['role', 'department'])
+
+            doctor.role = 'hod'
+            doctor.department = department
+            doctor.save(update_fields=['role', 'department'])
+            return {'ok': True, 'user': doctor}
     except User.DoesNotExist:
         return {'ok': False, 'error': 'Doctor not found.'}
-    current_hod = get_hod_by_department(department)
-    if current_hod and current_hod.id != doctor.id:
-        current_hod.role = 'doctor'
-        current_hod.department = None
-        current_hod.save(update_fields=['role', 'department'])
-    doctor.role = 'hod'
-    doctor.department = department
-    doctor.save(update_fields=['role', 'department'])
-    return {'ok': True, 'user': doctor}
 
 
-def lookup_student_in_reference(university_id: str) -> dict:
+def lookup_student_in_reference(university_id: str, password: str) -> dict:
     """
     Verify student against external university API.
     Sends: { university_id, password }
     Expects: { found: true, full_name: "...", department: "..." }
     """
-    import requests
-
-    EXTERNAL_API_URL = "https://your-university-api.example.com/verify"  # ← ضع الـ URL هون
+    external_api_url = os.getenv('STUDENT_VERIFY_URL', '').strip()
+    if not external_api_url:
+        logger.error('STUDENT_VERIFY_URL is not configured.')
+        return {'ok': False, 'error': 'Student verification service is unavailable.'}
 
     try:
         response = requests.post(
-            EXTERNAL_API_URL,
-            json={'university_id': university_id, 'password': university_id},
+            external_api_url,
+            json={'university_id': university_id, 'password': password},
             timeout=10,
         )
+        response.raise_for_status()
         data = response.json()
-    except Exception as e:
-        return {'ok': False, 'error': f'External API unreachable: {e}'}
+    except requests.RequestException:
+        logger.exception('Student verification request failed.')
+        return {'ok': False, 'error': 'Student verification service is unavailable.'}
+    except ValueError:
+        logger.exception('Student verification returned invalid JSON.')
+        return {'ok': False, 'error': 'Student verification service is unavailable.'}
 
     if not data.get('found'):
         return {'ok': False, 'error': 'Access Denied: ID not found in University records.'}

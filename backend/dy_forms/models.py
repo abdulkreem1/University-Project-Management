@@ -1,4 +1,5 @@
 from django.db import models
+from django.db.models import Q
 from django.conf import settings
 from accounts.models import DEPARTMENTS
 
@@ -49,6 +50,12 @@ class DynamicForm(models.Model):
 
     class Meta:
         ordering = ['-created_at']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['department', 'context'],
+                name='unique_dynamic_form_department_context',
+            ),
+        ]
 
     def __str__(self):
         return f"[{self.department}] {self.context} form"
@@ -98,8 +105,37 @@ class FormResponse(models.Model):
 class FieldResponse(models.Model):
     """Value for a single field in a FormResponse."""
     response    = models.ForeignKey(FormResponse, on_delete=models.CASCADE, related_name='field_responses')
-    field       = models.ForeignKey(FormField, on_delete=models.CASCADE, related_name='answers')
+    field       = models.ForeignKey(FormField, on_delete=models.SET_NULL, null=True, blank=True, related_name='answers')
+    field_label = models.CharField(max_length=255, blank=True)
+    field_type  = models.CharField(max_length=10, choices=FIELD_TYPES, blank=True)
+    field_options = models.JSONField(default=list, blank=True)
     value       = models.TextField(blank=True)
+    value_data  = models.JSONField(null=True, blank=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=['response', 'field'],
+                condition=Q(field__isnull=False),
+                name='unique_field_response_per_field',
+            ),
+        ]
 
     def __str__(self):
-        return f"{self.field.label}: {self.value[:50]}"
+        label = self.field_label or (self.field.label if self.field else 'Deleted field')
+        return f"{label}: {str(self.value_data if self.value_data is not None else self.value)[:50]}"
+
+    def save(self, *args, **kwargs):
+        if self.field:
+            self.field_label = self.field_label or self.field.label
+            self.field_type = self.field_type or self.field.field_type
+            self.field_options = self.field_options or self.field.options or []
+            if self.value_data is None:
+                from .validators import normalize_field_value, value_to_legacy_text
+                self.value_data = normalize_field_value(
+                    self.field,
+                    self.value,
+                    allow_legacy_checkbox_string=True,
+                )
+                self.value = value_to_legacy_text(self.value_data)
+        super().save(*args, **kwargs)

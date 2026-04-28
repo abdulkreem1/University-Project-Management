@@ -59,6 +59,9 @@ export const submitStudentProposal = (data) =>
 export const fetchMyProposal = () =>
   api.get('/api/projects/proposals/mine/');
 
+export const cancelProposal = (proposalId) =>
+  api.post(`/api/projects/proposals/${proposalId}/cancel/`);
+
 // ── Projects: UC-03 Browse & Apply ───────────────────────────────────────────
 export const browseIdeas = () =>
   api.get('/api/projects/ideas/browse/');
@@ -115,6 +118,12 @@ export const fetchMyProposalInvitations = () =>
 
 export const respondToProposalInvitation = (invId, action) =>
   api.post(`/api/projects/proposal-invitations/${invId}/respond/`, { action });
+
+export const replaceProposalMember = (proposalId, old_member_id, new_member_id) =>
+  api.post(`/api/projects/proposals/${proposalId}/replace-member/`, { old_member_id, new_member_id });
+
+export const replaceApplicationMember = (appId, old_member_id, new_member_id) =>
+  api.post(`/api/projects/applications/${appId}/replace-member/`, { old_member_id, new_member_id });
 
 // ── Doctors list (for supervisor dropdown) ────────────────────────────────────
 export const fetchDoctorsList = () =>
@@ -208,3 +217,40 @@ export const fetchHodBoards = () =>
 
 export const fetchHodStats = () =>
   api.get('/api/project-management/hod/stats/');
+
+// ── Workflow Management ────────────────────────────────────────────────────────
+export const fetchWorkflowTemplates = () =>
+  api.get('/api/workflow/templates/');
+
+export const fetchWorkflowTemplate = (templateId) =>
+  api.get(`/api/workflow/templates/${templateId}/`);
+
+export const createWorkflowTemplate = (data) =>
+  api.post('/api/workflow/templates/create/', data);
+
+export const updateWorkflowTemplate = (templateId, data) =>
+  api.put(`/api/workflow/templates/${templateId}/update/`, data);
+
+export const deleteWorkflowTemplate = (templateId) =>
+  api.delete(`/api/workflow/templates/${templateId}/delete/`);
+
+export const applyWorkflowToProject = (data) =>
+  api.post('/api/workflow/apply/', data);
+
+export const fetchProjectWorkflow = (projectBoardId) =>
+  api.get(`/api/workflow/project/${projectBoardId}/`);
+
+export const fetchPendingWorkflowStages = () =>
+  api.get('/api/workflow/pending/');
+
+export const submitWorkflowStage = (stageInstanceId, data) =>
+  api.post(`/api/workflow/stage/${stageInstanceId}/submit/`, data);
+
+export const reviewWorkflowStage = (stageInstanceId, data) =>
+  api.post(`/api/workflow/stage/${stageInstanceId}/review/`, data);
+
+export const fetchAvailableProjects = () =>
+  api.get('/api/workflow/available-projects/');
+
+export const fetchReviewableProjects = () =>
+  api.get('/api/workflow/reviewable-projects/');

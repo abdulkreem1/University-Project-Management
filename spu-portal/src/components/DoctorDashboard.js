@@ -5,6 +5,9 @@ import SubmitIdea from './SubmitIdea';
 import SupervisorReview from './SupervisorReview';
 import DoctorApplicationReview from './DoctorApplicationReview';
 import SupervisorProjects from './SupervisorProjects';
+import WorkflowBuilder from './WorkflowBuilder';
+import ApplyWorkflow from './ApplyWorkflow';
+import WorkflowReview from './WorkflowReview';
 
 /* Premium SVG Icons */
 const Icons = {
@@ -26,6 +29,9 @@ const CARDS = [
   { icon: Icons.FileText, label: 'Student Proposals',   desc: 'Review proposals assigned to you',   page: 'supervisor-review' },
   { icon: Icons.Inbox, label: 'Idea Applications',   desc: 'Review student applications on your ideas', page: 'app-review' },
   { icon: Icons.Kanban, label: 'Supervised Projects',  desc: 'Track progress of registered student projects', page: 'supervised-projects' },
+  { icon: Icons.FileText, label: 'Workflow Builder',     desc: 'Create dynamic project workflows',          page: 'workflow' },
+  { icon: Icons.ClipboardList, label: 'Apply Workflow',       desc: 'Apply workflow templates to projects',      page: 'applyworkflow' },
+  { icon: Icons.ClipboardList, label: 'Review Workflows',     desc: 'Review and approve workflow submissions',   page: 'reviewworkflow' },
 ];
 
 export default function DoctorDashboard({ user }) {
@@ -36,6 +42,9 @@ export default function DoctorDashboard({ user }) {
   if (page === 'supervisor-review')    return <SupervisorReview onBack={() => setPage('dashboard')} />;
   if (page === 'app-review')           return <DoctorApplicationReview onBack={() => setPage('dashboard')} />;
   if (page === 'supervised-projects')  return <SupervisorProjects onBack={() => setPage('dashboard')} />;
+  if (page === 'workflow')             return <WorkflowBuilder onBack={() => setPage('dashboard')} />;
+  if (page === 'applyworkflow')        return <ApplyWorkflow onBack={() => setPage('dashboard')} />;
+  if (page === 'reviewworkflow')       return <WorkflowReview onBack={() => setPage('dashboard')} />;
 
   return (
     <div className="premium-dashboard">

@@ -1,5 +1,6 @@
 from django.contrib.auth.models import AbstractUser
 from django.db import models
+from django.db.models import Q
 
 
 DEPARTMENTS = [
@@ -23,12 +24,25 @@ class User(AbstractUser):
     must_change_password = models.BooleanField(default=False)
     department           = models.CharField(max_length=50, choices=DEPARTMENTS, null=True, blank=True)
 
+    class Meta:
+        verbose_name = 'user'
+        verbose_name_plural = 'users'
+        constraints = [
+            models.UniqueConstraint(
+                fields=['department'],
+                condition=Q(role='hod'),
+                name='unique_hod_per_department',
+            ),
+        ]
+
     def __str__(self):
         return self.username
 
     def save(self, *args, **kwargs):
-        # Dean is always superuser and staff
-        if self.role == 'dean':
+        if self.is_superuser:
+            self.role = 'dean'
+            self.is_staff = True
+        elif self.role == 'dean':
             self.is_superuser = True
             self.is_staff = True
         super().save(*args, **kwargs)

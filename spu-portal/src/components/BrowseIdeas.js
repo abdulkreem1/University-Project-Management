@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { browseIdeas, applyOnIdea, fetchMyIdeaApplication, fetchMyProposal, fetchStudentForm } from '../api';
 import StudentSearch from './StudentSearch';
+import DynamicCheckboxGroup from './DynamicCheckboxGroup';
 import './BrowseIdeas.css';
 
 /* Premium SVG Icons */
@@ -27,6 +28,8 @@ const STATUS_META = {
 };
 
 const EMPTY_APPLY = { team_size: 1, member_ids: [] };
+
+const emptyValueForField = (field) => field.field_type === 'checkbox' ? [] : '';
 
 export default function BrowseIdeas({ onBack }) {
   const [ideas, setIdeas]           = useState([]);
@@ -71,7 +74,7 @@ export default function BrowseIdeas({ onBack }) {
         if (res.data?.fields?.length) {
           setDynForm(res.data);
           const init = {};
-          res.data.fields.forEach(f => { init[f.id] = ''; });
+          res.data.fields.forEach(f => { init[f.id] = emptyValueForField(f); });
           setDynValues(init);
         }
       })
@@ -101,7 +104,7 @@ export default function BrowseIdeas({ onBack }) {
         // dynamic form fields sent together in the same request
         form_id:         dynForm?.id || null,
         field_responses: dynForm
-          ? (dynForm.fields || []).map(f => ({ field: f.id, value: dynValues[f.id] || '' }))
+          ? (dynForm.fields || []).map(f => ({ field: f.id, value: dynValues[f.id] ?? emptyValueForField(f) }))
           : [],
       });
       setMyApp(res.data);
@@ -313,7 +316,7 @@ export default function BrowseIdeas({ onBack }) {
                     <BrowseDynField
                       key={field.id}
                       field={field}
-                      value={dynValues[field.id] || ''}
+                      value={dynValues[field.id] ?? emptyValueForField(field)}
                       onChange={val => setDynValues(prev => ({ ...prev, [field.id]: val }))}
                     />
                   ))}
@@ -359,9 +362,8 @@ function BrowseDynField({ field, value, onChange }) {
   if (field_type === 'radio')
     return <div>{lbl}<div style={{display:'flex',flexDirection:'column',gap:6}}>{(options||[]).map(o=><label key={o} style={{display:'flex',alignItems:'center',gap:8,fontSize:14}}><input type="radio" name={`bdyn-${field.id}`} value={o} checked={value===o} onChange={()=>onChange(o)} required={required}/>{o}</label>)}</div></div>;
   if (field_type === 'checkbox')
-    return <div>{lbl}<div style={{display:'flex',flexDirection:'column',gap:6}}>{(options||[]).map(o=>{const checked=(value||'').split(',').includes(o);const toggle=()=>{const cur=value?value.split(',').filter(Boolean):[];onChange(checked?cur.filter(v=>v!==o).join(','):[...cur,o].join(','))};return<label key={o} style={{display:'flex',alignItems:'center',gap:8,fontSize:14}}><input type="checkbox" checked={checked} onChange={toggle}/>{o}</label>;})}</div></div>;
+    return <div>{lbl}<DynamicCheckboxGroup field={field} value={value} onChange={onChange} /></div>;
   if (field_type === 'file')
     return <div>{lbl}<input className="form-control" type="file" required={required} accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.gif" onChange={e=>{const file=e.target.files?.[0];if(file)onChange(file.name);}}/><small style={{fontSize:12,color:'#64748b',marginTop:4,display:'block'}}>Upload a file (PDF, DOC, or image)</small></div>;
   return null;
 }
-

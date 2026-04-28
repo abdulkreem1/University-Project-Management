@@ -1,4 +1,5 @@
 from django.db import models
+from django.db.models import Q
 from django.conf import settings
 from accounts.models import DEPARTMENTS
 
@@ -151,6 +152,13 @@ class IdeaApplication(models.Model):
 
     class Meta:
         unique_together = ('idea', 'student')
+        constraints = [
+            models.UniqueConstraint(
+                fields=['idea'],
+                condition=Q(status='registered'),
+                name='unique_registered_application_per_idea',
+            ),
+        ]
 
     def __str__(self):
         return f"{self.student.username} → {self.idea.title} [{self.status}]"

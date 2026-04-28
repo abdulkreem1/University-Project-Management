@@ -339,3 +339,39 @@
 
 .btn-save:hover:not(:disabled) { background: #4f46e5; }
 .btn-save:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* Tabs */
+.my-project-container {
+  width: 100%;
+}
+
+.my-project-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 24px;
+  border-bottom: 2px solid var(--border, #e2e8f0);
+  padding: 0 24px;
+}
+
+.my-project-tab {
+  padding: 12px 24px;
+  background: transparent;
+  border: none;
+  border-bottom: 3px solid transparent;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-secondary, #64748b);
+  cursor: pointer;
+  transition: all 0.15s;
+  margin-bottom: -2px;
+}
+
+.my-project-tab:hover {
+  color: var(--primary, #6366f1);
+}
+
+.my-project-tab.active {
+  color: var(--primary, #6366f1);
+  border-bottom-color: var(--primary, #6366f1);
+}
+

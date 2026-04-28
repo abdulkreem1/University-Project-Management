@@ -2,6 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { fetchHodPending, hodReview, fetchResponseByProposal } from '../api';
 import './SupervisorReview.css'; /* reuse same styles */
 
+const renderResponseValue = (value) => {
+  if (Array.isArray(value)) return value.length ? <div className="sv-choice-pills">{value.map((item) => <span key={item}>{item}</span>)}</div> : null;
+  return value || null;
+};
+
 export default function HodProposalReview({ onBack }) {
   const [proposals, setProposals]     = useState([]);
   const [loading, setLoading]         = useState(true);
@@ -115,7 +120,7 @@ export default function HodProposalReview({ onBack }) {
                         <div key={idx} className="sv-form-field">
                           <span className="sv-form-field-label">{fr.field_label}</span>
                           <span className="sv-form-field-value">
-                            {fr.value || <em className="sv-form-empty">—</em>}
+                            {renderResponseValue(fr.value) || <em className="sv-form-empty">—</em>}
                           </span>
                         </div>
                       ))}

@@ -24,13 +24,12 @@ class ProjectIdeaSerializer(serializers.ModelSerializer):
         return obj.doctor.get_full_name() or obj.doctor.username
 
     def get_is_taken(self, obj):
-        return obj.applications.filter(status='registered').exists()
+        return any(app.status == 'registered' for app in obj.applications.all())
 
     def get_registered_team(self, obj):
         """Return leader + accepted members if idea is registered."""
-        try:
-            app = obj.applications.get(status='registered')
-        except Exception:
+        app = next((a for a in obj.applications.all() if a.status == 'registered'), None)
+        if not app:
             return None
         leader = {
             'username': app.student.username,
@@ -88,6 +87,11 @@ class StudentIdeaProposalSerializer(serializers.ModelSerializer):
             }
             for inv in obj.invitations.all()
         ]
+
+    def validate_supervisor(self, value):
+        if value and getattr(value, 'role', None) != 'doctor':
+            raise serializers.ValidationError('Supervisor must be a doctor.')
+        return value
 
 
 class ProposalInvitationSerializer(serializers.ModelSerializer):

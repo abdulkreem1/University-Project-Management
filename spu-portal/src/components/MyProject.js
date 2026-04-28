@@ -1,11 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { fetchMyBoard } from '../api';
 import KanbanBoard from './KanbanBoard';
+import ProjectWorkflowView from './ProjectWorkflowView';
+import './MyProject.css';
 
 export default function MyProject() {
   const [board, setBoard]     = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState('');
+  const [activeTab, setActiveTab] = useState('board'); // 'board' | 'workflow'
 
   useEffect(() => {
     fetchMyBoard()
@@ -27,5 +30,28 @@ export default function MyProject() {
     </div>
   );
 
-  return <KanbanBoard board={board} setBoard={setBoard} canEdit={true} />;
+  return (
+    <div className="my-project-container">
+      <div className="my-project-tabs">
+        <button
+          className={`my-project-tab ${activeTab === 'board' ? 'active' : ''}`}
+          onClick={() => setActiveTab('board')}
+        >
+          📋 Project Board
+        </button>
+        <button
+          className={`my-project-tab ${activeTab === 'workflow' ? 'active' : ''}`}
+          onClick={() => setActiveTab('workflow')}
+        >
+          📝 Workflow
+        </button>
+      </div>
+
+      {activeTab === 'board' ? (
+        <KanbanBoard board={board} setBoard={setBoard} canEdit={true} />
+      ) : (
+        <ProjectWorkflowView projectBoardId={board.id} />
+      )}
+    </div>
+  );
 }

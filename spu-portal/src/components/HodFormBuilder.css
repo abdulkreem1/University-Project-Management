@@ -163,12 +163,87 @@
 .fb-options-area {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 8px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 10px;
+}
+
+.fb-options-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
 .fb-options-label {
   font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-primary, #1e293b);
+}
+
+.fb-options-hint,
+.fb-options-empty {
+  font-size: 12px;
   color: var(--text-secondary, #64748b);
+}
+
+.fb-option-add-row {
+  display: flex;
+  gap: 8px;
+}
+
+.fb-option-input {
+  min-width: 0;
+}
+
+.fb-option-add-btn {
+  border: none;
+  border-radius: 8px;
+  background: var(--primary, #6366f1);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 800;
+  padding: 0 14px;
+  cursor: pointer;
+}
+
+.fb-option-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.fb-option-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  background: #eef2ff;
+  color: #4338ca;
+  border: 1px solid #c7d2fe;
+  border-radius: 999px;
+  padding: 5px 8px 5px 10px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.fb-option-chip button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border: none;
+  border-radius: 50%;
+  background: #c7d2fe;
+  color: #312e81;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
 }
 
 .fb-textarea-small {

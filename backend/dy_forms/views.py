@@ -6,6 +6,39 @@ from django.db import transaction
 from .models import DynamicForm, FormField, FormResponse
 from .serializers import DynamicFormSerializer, FormResponseSerializer
 from .permissions import IsHod, IsStudent
+from .validators import validate_context, validate_form_fields
+
+
+MAX_RESPONSE_LIST_SIZE = 100
+
+
+def _validation_error(error):
+    return Response({'error': 'Validation failed.', 'details': error}, status=400)
+
+
+def _empty_form_response():
+    return Response({'id': None, 'title': '', 'description': '', 'fields': []})
+
+
+def _can_access_response(user, response):
+    if user.role == 'hod' and response.form.department == user.department:
+        return True
+    if user.role == 'student' and response.student_id == user.id:
+        return True
+    if user.role == 'doctor':
+        try:
+            from projects.models import StudentIdeaProposal, IdeaApplication
+            if response.proposal_id and StudentIdeaProposal.objects.filter(
+                pk=response.proposal_id, supervisor=user
+            ).exists():
+                return True
+            if response.application_id and IdeaApplication.objects.filter(
+                pk=response.application_id, idea__doctor=user
+            ).exists():
+                return True
+        except Exception:
+            return False
+    return False
 
 
 # ── HoD: save/update form for their department ───────────────────────────────
@@ -14,11 +47,16 @@ from .permissions import IsHod, IsStudent
 @permission_classes([IsAuthenticated, IsHod])
 def hod_get_form(request, context):
     """GET the HoD's form for a given context (propose / browse)."""
+    try:
+        validate_context(context)
+    except Exception as exc:
+        return _validation_error({'context': exc.detail if hasattr(exc, 'detail') else str(exc)})
+
     form = DynamicForm.objects.filter(
         department=request.user.department, context=context
     ).prefetch_related('fields').first()
     if not form:
-        return Response({'fields': [], 'title': '', 'id': None})
+        return _empty_form_response()
     return Response(DynamicFormSerializer(form).data)
 
 
@@ -26,7 +64,12 @@ def hod_get_form(request, context):
 @permission_classes([IsAuthenticated, IsHod])
 def hod_save_form(request, context):
     """POST to create/replace the HoD's form fields for a given context."""
-    fields_data = request.data.get('fields', [])
+    try:
+        validate_context(context)
+        fields_data = validate_form_fields(request.data.get('fields', []))
+    except Exception as exc:
+        return _validation_error(exc.detail if hasattr(exc, 'detail') else str(exc))
+
     title       = request.data.get('title', '')
     description = request.data.get('description', '')
 
@@ -50,10 +93,10 @@ def hod_save_form(request, context):
         for idx, f in enumerate(fields_data):
             FormField.objects.create(
                 form       = form,
-                label      = f.get('label', ''),
-                field_type = f.get('field_type', 'text'),
-                required   = f.get('required', False),
-                options    = f.get('options', []),
+                label      = f['label'],
+                field_type = f['field_type'],
+                required   = f['required'],
+                options    = f['options'],
                 order      = idx,
             )
 
@@ -68,11 +111,16 @@ def hod_save_form(request, context):
 @permission_classes([IsAuthenticated])
 def student_get_form(request, department, context):
     """GET the dynamic form for a department+context (visible to students)."""
+    try:
+        validate_context(context)
+    except Exception as exc:
+        return _validation_error({'context': exc.detail if hasattr(exc, 'detail') else str(exc)})
+
     form = DynamicForm.objects.filter(
         department=department, context=context
     ).prefetch_related('fields').first()
     if not form:
-        return Response({'fields': [], 'title': '', 'id': None})
+        return _empty_form_response()
     return Response(DynamicFormSerializer(form).data)
 
 
@@ -84,7 +132,7 @@ def submit_form_response(request):
     """POST a student's filled form response."""
     serializer = FormResponseSerializer(data=request.data)
     if not serializer.is_valid():
-        return Response(serializer.errors, status=400)
+        return _validation_error(serializer.errors)
     response = serializer.save(student=request.user)
     return Response(FormResponseSerializer(response).data, status=201)
 
@@ -98,7 +146,7 @@ def hod_list_responses(request, context):
     responses = FormResponse.objects.filter(
         form__department=request.user.department,
         form__context=context,
-    ).select_related('student').prefetch_related('field_responses__field')
+    ).select_related('student', 'form').prefetch_related('field_responses__field')[:MAX_RESPONSE_LIST_SIZE]
     return Response(FormResponseSerializer(responses, many=True).data)
 
 
@@ -106,11 +154,10 @@ def hod_list_responses(request, context):
 @permission_classes([IsAuthenticated])
 def get_response_by_proposal(request, proposal_id):
     """GET the form response linked to a specific proposal."""
-    try:
-        resp = FormResponse.objects.prefetch_related('field_responses__field').get(
-            proposal_id=proposal_id
-        )
-    except FormResponse.DoesNotExist:
+    resp = FormResponse.objects.select_related('form', 'student').prefetch_related(
+        'field_responses__field'
+    ).filter(proposal_id=proposal_id).order_by('-submitted_at').first()
+    if not resp or not _can_access_response(request.user, resp):
         return Response({'detail': 'Not found.'}, status=404)
     return Response(FormResponseSerializer(resp).data)
 
@@ -119,10 +166,9 @@ def get_response_by_proposal(request, proposal_id):
 @permission_classes([IsAuthenticated])
 def get_response_by_application(request, application_id):
     """GET the form response linked to a specific idea application."""
-    try:
-        resp = FormResponse.objects.prefetch_related('field_responses__field').get(
-            application_id=application_id
-        )
-    except FormResponse.DoesNotExist:
+    resp = FormResponse.objects.select_related('form', 'student').prefetch_related(
+        'field_responses__field'
+    ).filter(application_id=application_id).order_by('-submitted_at').first()
+    if not resp or not _can_access_response(request.user, resp):
         return Response({'detail': 'Not found.'}, status=404)
     return Response(FormResponseSerializer(resp).data)

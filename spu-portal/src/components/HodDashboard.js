@@ -5,6 +5,9 @@ import HodIdeaReview from './HodIdeaReview';
 import HodApplicationReview from './HodApplicationReview';
 import HodFormBuilder from './HodFormBuilder';
 import HodProjects from './HodProjects';
+import WorkflowBuilder from './WorkflowBuilder';
+import ApplyWorkflow from './ApplyWorkflow';
+import WorkflowReview from './WorkflowReview';
 
 const DEPT_LABELS = {
   software_engineering:    'Software Engineering',
@@ -35,7 +38,9 @@ const CARDS = [
   { icon: Icons.Inbox, label: 'Idea Applications',    desc: 'Register student applications on ideas',   page: 'applications' },
   { icon: Icons.Forms, label: 'Form Builder',          desc: 'Customize student submission forms',        page: 'formbuilder' },
   { icon: Icons.Kanban, label: 'Active Projects',       desc: 'Monitor department project progress',       page: 'projects' },
-  { icon: Icons.BarChart, label: 'Reports',              desc: 'Department statistics',                    page: null },
+  { icon: Icons.BarChart, label: 'Workflow Builder',     desc: 'Create dynamic project workflows',          page: 'workflow' },
+  { icon: Icons.ClipboardCheck, label: 'Apply Workflow',       desc: 'Apply workflow templates to projects',      page: 'applyworkflow' },
+  { icon: Icons.ClipboardCheck, label: 'Review Workflows',     desc: 'Review and approve workflow submissions',   page: 'reviewworkflow' },
 ];
 
 export default function HodDashboard({ user }) {
@@ -47,6 +52,9 @@ export default function HodDashboard({ user }) {
   if (page === 'applications') return <HodApplicationReview onBack={() => setPage('dashboard')} />;
   if (page === 'formbuilder')  return <HodFormBuilder       onBack={() => setPage('dashboard')} />;
   if (page === 'projects')     return <HodProjects          onBack={() => setPage('dashboard')} user={user} />;
+  if (page === 'workflow')     return <WorkflowBuilder      onBack={() => setPage('dashboard')} />;
+  if (page === 'applyworkflow') return <ApplyWorkflow       onBack={() => setPage('dashboard')} />;
+  if (page === 'reviewworkflow') return <WorkflowReview     onBack={() => setPage('dashboard')} />;
 
   return (
     <div className="premium-dashboard">

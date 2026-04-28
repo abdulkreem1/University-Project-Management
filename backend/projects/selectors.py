@@ -2,7 +2,10 @@ from .models import ProjectIdea, StudentIdeaProposal
 
 
 def get_ideas_for_doctor(doctor):
-    return ProjectIdea.objects.filter(doctor=doctor).order_by('-created_at')
+    return ProjectIdea.objects.filter(doctor=doctor).prefetch_related(
+        'applications', 'applications__student',
+        'applications__invitations', 'applications__invitations__invitee',
+    ).order_by('-created_at')
 
 
 def get_approved_ideas():
@@ -19,14 +22,18 @@ def get_all_ideas():
 
 def get_student_proposal(student):
     """Return the student's latest active proposal, or the latest one of any status."""
-    active = StudentIdeaProposal.objects.filter(
+    base = StudentIdeaProposal.objects.select_related('student', 'supervisor').prefetch_related(
+        'invitations', 'invitations__invitee'
+    )
+
+    active = base.filter(
         student=student,
         status__in=['awaiting_members', 'pending_supervisor', 'pending_hod', 'assigned'],
     ).order_by('-created_at').first()
     if active:
         return active
     # Fall back to latest (rejected) so student can see history
-    return StudentIdeaProposal.objects.filter(student=student).order_by('-created_at').first()
+    return base.filter(student=student).order_by('-created_at').first()
 
 
 def get_pending_supervisor_proposals(supervisor):
@@ -34,7 +41,9 @@ def get_pending_supervisor_proposals(supervisor):
     return StudentIdeaProposal.objects.filter(
         supervisor=supervisor,
         status='pending_supervisor',
-    ).select_related('student').order_by('-created_at')
+    ).select_related('student', 'supervisor').prefetch_related(
+        'invitations', 'invitations__invitee'
+    ).order_by('-created_at')
 
 
 def get_pending_hod_proposals(department):
@@ -42,7 +51,9 @@ def get_pending_hod_proposals(department):
     return StudentIdeaProposal.objects.filter(
         department=department,
         status='pending_hod',
-    ).select_related('student', 'supervisor').order_by('-created_at')
+    ).select_related('student', 'supervisor').prefetch_related(
+        'invitations', 'invitations__invitee'
+    ).order_by('-created_at')
 
 
 def get_pending_doctor_ideas_for_hod(department):
@@ -57,7 +68,9 @@ def get_pending_doctor_ideas_for_hod(department):
 def get_student_idea_application(student):
     """Return the student's active IdeaApplication or None."""
     from .models import IdeaApplication
-    return IdeaApplication.objects.filter(student=student).order_by('-created_at').first()
+    return IdeaApplication.objects.filter(student=student).select_related(
+        'student', 'idea', 'idea__doctor'
+    ).prefetch_related('invitations', 'invitations__invitee').order_by('-created_at').first()
 
 
 def get_pending_doctor_applications(doctor):
@@ -66,7 +79,9 @@ def get_pending_doctor_applications(doctor):
     return IdeaApplication.objects.filter(
         idea__doctor=doctor,
         status='pending_doctor',
-    ).select_related('student', 'idea').order_by('-created_at')
+    ).select_related('student', 'idea', 'idea__doctor').prefetch_related(
+        'invitations', 'invitations__invitee'
+    ).order_by('-created_at')
 
 
 def get_pending_hod_applications(department):
@@ -75,4 +90,6 @@ def get_pending_hod_applications(department):
     return IdeaApplication.objects.filter(
         idea__department=department,
         status='pending_hod',
-    ).select_related('student', 'idea').order_by('-created_at')
+    ).select_related('student', 'idea', 'idea__doctor').prefetch_related(
+        'invitations', 'invitations__invitee'
+    ).order_by('-created_at')

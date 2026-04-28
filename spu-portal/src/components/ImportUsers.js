@@ -74,7 +74,7 @@ export default function ImportUsers({ onBack }) {
       <div className="import-info-banner">
         <div className="import-info-icon">{Icons.Info}</div>
         <div className="import-info-text">
-          <strong>Important Instructions:</strong> The Excel file must contain exactly three columns: <code>full_name</code>, <code>identifier</code>, and <code>email</code>. The initial password will automatically be set to the user's identifier value.
+          <strong>Important Instructions:</strong> The Excel file must contain exactly three columns: <code>full_name</code>, <code>identifier</code>, and <code>email</code>. Imported users must change their temporary password after first login.
         </div>
       </div>
 
@@ -164,7 +164,6 @@ export default function ImportUsers({ onBack }) {
                 <tr>
                   <th>No.</th>
                   <th>System Username</th>
-                  <th>Generated Password</th>
                   <th>Account Type</th>
                   <th>Access Scope</th>
                 </tr>
@@ -174,7 +173,6 @@ export default function ImportUsers({ onBack }) {
                   <tr key={u.username}>
                     <td>{i + 1}</td>
                     <td>{u.username}</td>
-                    <td><code className="password-pill">{u.password}</code></td>
                     <td>
                       <span className={`role-badge role-badge--${role}`}>
                         {role === 'student' ? Icons.Student : Icons.Doctor}
@@ -193,7 +191,7 @@ export default function ImportUsers({ onBack }) {
           </div>
           <div className="import-note-modern">
             <div className="import-note-icon">{Icons.Info}</div>
-            <p>Users have been added to the system database. They will be directed to their respective dashboards upon first login.</p>
+            <p>Users have been added to the system database. Share credentials through a secure channel and force a password change on first login.</p>
           </div>
         </div>
       )}
