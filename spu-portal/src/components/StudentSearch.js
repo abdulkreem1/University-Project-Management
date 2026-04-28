@@ -16,6 +16,7 @@ export default function StudentSearch({ value, onChange, placeholder = 'Search b
   const [open, setOpen]         = useState(false);
   const [loading, setLoading]   = useState(false);
   const debounce                = useRef(null);
+  const requestSeq              = useRef(0);
   const wrapRef                 = useRef(null);
 
   // Close dropdown on outside click
@@ -24,7 +25,11 @@ export default function StudentSearch({ value, onChange, placeholder = 'Search b
       if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false);
     };
     document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
+    return () => {
+      document.removeEventListener('mousedown', handler);
+      clearTimeout(debounce.current);
+      requestSeq.current += 1;
+    };
   }, []);
 
   // Sync display when value cleared externally
@@ -38,18 +43,28 @@ export default function StudentSearch({ value, onChange, placeholder = 'Search b
     onChange(''); // clear selection while typing
 
     clearTimeout(debounce.current);
-    if (!q.trim()) { setResults([]); setOpen(false); return; }
+    if (!q.trim()) {
+      requestSeq.current += 1;
+      setLoading(false);
+      setResults([]);
+      setOpen(false);
+      return;
+    }
 
     debounce.current = setTimeout(async () => {
+      const seq = requestSeq.current + 1;
+      requestSeq.current = seq;
       setLoading(true);
       try {
         const res = await searchStudents(q);
-        setResults(res.data);
-        setOpen(true);
+        if (seq === requestSeq.current) {
+          setResults(res.data);
+          setOpen(true);
+        }
       } catch {
-        setResults([]);
+        if (seq === requestSeq.current) setResults([]);
       } finally {
-        setLoading(false);
+        if (seq === requestSeq.current) setLoading(false);
       }
     }, 300);
   };
@@ -71,17 +86,20 @@ export default function StudentSearch({ value, onChange, placeholder = 'Search b
         onChange={handleInput}
         placeholder={placeholder}
         autoComplete="off"
+        role="combobox"
         aria-autocomplete="list"
         aria-expanded={open}
+        aria-controls={open ? `${id || 'student-search'}-results` : undefined}
       />
       {loading && <span className="ss-spinner" aria-hidden="true">⏳</span>}
       {open && results.length > 0 && (
-        <ul className="ss-dropdown" role="listbox">
+        <ul className="ss-dropdown" role="listbox" id={`${id || 'student-search'}-results`}>
           {results.map((s) => (
             <li
               key={s.username}
               className="ss-option"
               role="option"
+              aria-selected={value === s.username}
               onMouseDown={() => handleSelect(s)}
             >
               <span className="ss-option-name">{s.name || s.username}</span>

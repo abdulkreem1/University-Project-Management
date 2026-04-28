@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { fetchProjectWorkflow, submitWorkflowStage } from '../api';
 import './ProjectWorkflowView.css';
 
@@ -209,11 +209,7 @@ export default function ProjectWorkflowView({ projectBoardId }) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
-  useEffect(() => {
-    loadWorkflow();
-  }, [projectBoardId]);
-
-  const loadWorkflow = () => {
+  const loadWorkflow = useCallback(() => {
     setLoading(true);
     setError('');
     fetchProjectWorkflow(projectBoardId)
@@ -228,7 +224,11 @@ export default function ProjectWorkflowView({ projectBoardId }) {
         }
       })
       .finally(() => setLoading(false));
-  };
+  }, [projectBoardId]);
+
+  useEffect(() => {
+    loadWorkflow();
+  }, [loadWorkflow]);
 
   const handleSubmitStage = async (formData) => {
     setSubmitting(true);

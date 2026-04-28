@@ -30,6 +30,7 @@ from .models import StudentIdeaProposal, ProjectIdea, IdeaApplication, TeamInvit
 
 MAX_STUDENT_SEARCH_RESULTS = 20
 MIN_STUDENT_SEARCH_CHARS = 2
+MAX_LIST_RESPONSE_SIZE = 100
 
 
 def _validation_error_response(errors):
@@ -40,20 +41,16 @@ def _save_form_response(student, form_id, field_responses, proposal_id=None, app
     """Save a FormResponse + FieldResponses if form_id and field_responses are provided."""
     if not form_id or not isinstance(field_responses, list):
         return
-    from dy_forms.models import DynamicForm, FormResponse, FieldResponse
-    try:
-        form = DynamicForm.objects.get(pk=form_id)
-    except DynamicForm.DoesNotExist:
-        return
-    resp = FormResponse.objects.create(
-        form=form, student=student,
-        proposal_id=proposal_id, application_id=application_id,
-    )
-    for fr in field_responses:
-        field_id = fr.get('field')
-        value    = fr.get('value', '')
-        if field_id:
-            FieldResponse.objects.create(response=resp, field_id=field_id, value=value)
+    from dy_forms.serializers import FormResponseSerializer
+
+    serializer = FormResponseSerializer(data={
+        'form': form_id,
+        'proposal_id': proposal_id,
+        'application_id': application_id,
+        'field_responses': field_responses,
+    })
+    serializer.is_valid(raise_exception=True)
+    serializer.save(student=student)
 
 
 # ── UC-01: Doctor ideas ───────────────────────────────────────────────────────
@@ -74,7 +71,7 @@ def submit_idea(request):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsDoctor])
 def my_ideas(request):
-    ideas = get_ideas_for_doctor(request.user)
+    ideas = get_ideas_for_doctor(request.user)[:MAX_LIST_RESPONSE_SIZE]
     return Response(ProjectIdeaSerializer(ideas, many=True).data)
 
 
@@ -147,7 +144,7 @@ def cancel_proposal_view(request, proposal_id):
 @permission_classes([IsAuthenticated, IsStudent])
 def list_doctors_for_student(request):
     """Return all doctors for the supervisor dropdown."""
-    doctors = User.objects.filter(role='doctor').values('id', 'username', 'first_name', 'last_name', 'department')
+    doctors = User.objects.filter(role='doctor').values('id', 'username', 'first_name', 'last_name', 'department')[:MAX_LIST_RESPONSE_SIZE]
     result = [
         {
             'id': d['id'],
@@ -188,7 +185,7 @@ def list_students_for_team(request):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsDoctor])
 def supervisor_pending_proposals(request):
-    proposals = get_pending_supervisor_proposals(request.user)
+    proposals = get_pending_supervisor_proposals(request.user)[:MAX_LIST_RESPONSE_SIZE]
     return Response(StudentIdeaProposalSerializer(proposals, many=True).data)
 
 
@@ -219,7 +216,7 @@ def supervisor_review(request, proposal_id):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsHod])
 def hod_pending_proposals(request):
-    proposals = get_pending_hod_proposals(request.user.department)
+    proposals = get_pending_hod_proposals(request.user.department)[:MAX_LIST_RESPONSE_SIZE]
     return Response(StudentIdeaProposalSerializer(proposals, many=True).data)
 
 
@@ -250,7 +247,7 @@ def hod_review(request, proposal_id):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsHod])
 def hod_pending_doctor_ideas(request):
-    ideas = get_pending_doctor_ideas_for_hod(request.user.department)
+    ideas = get_pending_doctor_ideas_for_hod(request.user.department)[:MAX_LIST_RESPONSE_SIZE]
     return Response(ProjectIdeaSerializer(ideas, many=True).data)
 
 
@@ -282,7 +279,7 @@ def hod_review_idea(request, idea_id):
 @permission_classes([IsAuthenticated, IsStudent])
 def browse_ideas(request):
     """Return all approved ideas for students to browse."""
-    ideas = get_approved_ideas()
+    ideas = get_approved_ideas()[:MAX_LIST_RESPONSE_SIZE]
     return Response(ProjectIdeaSerializer(ideas, many=True).data)
 
 
@@ -328,7 +325,7 @@ def my_idea_application(request):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsDoctor])
 def doctor_pending_applications(request):
-    apps = get_pending_doctor_applications(request.user)
+    apps = get_pending_doctor_applications(request.user)[:MAX_LIST_RESPONSE_SIZE]
     return Response(IdeaApplicationSerializer(apps, many=True).data)
 
 
@@ -359,7 +356,7 @@ def doctor_review_app(request, app_id):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsHod])
 def hod_pending_applications(request):
-    apps = get_pending_hod_applications(request.user.department)
+    apps = get_pending_hod_applications(request.user.department)[:MAX_LIST_RESPONSE_SIZE]
     return Response(IdeaApplicationSerializer(apps, many=True).data)
 
 

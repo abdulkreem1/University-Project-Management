@@ -1,5 +1,6 @@
 from django.db import models
 from django.conf import settings
+from django.utils.text import get_valid_filename
 import os
 
 
@@ -32,6 +33,11 @@ class ProjectBoard(models.Model):
     )
     title      = models.CharField(max_length=255)
     created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['created_at']),
+        ]
 
     def __str__(self):
         return f"Board: {self.title}"
@@ -81,6 +87,13 @@ class Task(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    class Meta:
+        indexes = [
+            models.Index(fields=['board', 'status']),
+            models.Index(fields=['assignee', 'status']),
+            models.Index(fields=['board', '-updated_at']),
+        ]
+
     def __str__(self):
         return f"{self.title} [{self.status}]"
 
@@ -99,13 +112,18 @@ class TaskComment(models.Model):
 
     class Meta:
         ordering = ['created_at']
+        indexes = [
+            models.Index(fields=['task', 'created_at']),
+            models.Index(fields=['author', 'created_at']),
+        ]
 
     def __str__(self):
         return f"Comment by {self.author} on {self.task}"
 
 
 def _attachment_upload_path(instance, filename):
-    return f'task_attachments/{instance.task.board_id}/{instance.task_id}/{filename}'
+    safe_filename = get_valid_filename(os.path.basename(filename))
+    return f'task_attachments/{instance.task.board_id}/{instance.task_id}/{safe_filename}'
 
 
 class TaskAttachment(models.Model):
@@ -120,6 +138,12 @@ class TaskAttachment(models.Model):
     filename    = models.CharField(max_length=255)   # original name
     file_size   = models.PositiveIntegerField(default=0)  # bytes
     created_at  = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['task', '-created_at']),
+            models.Index(fields=['uploaded_by', '-created_at']),
+        ]
 
     def __str__(self):
         return f"{self.filename} → {self.task}"
@@ -163,6 +187,10 @@ class ActivityLog(models.Model):
 
     class Meta:
         ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['board', '-created_at']),
+            models.Index(fields=['actor', '-created_at']),
+        ]
 
     def __str__(self):
         return f"{self.actor} {self.verb} [{self.created_at:%Y-%m-%d %H:%M}]"

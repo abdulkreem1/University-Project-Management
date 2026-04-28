@@ -48,13 +48,28 @@ export default function NotificationBell() {
   const [open, setOpen]           = useState(false);
   const [loaded, setLoaded]       = useState(false);
   const wrapRef                   = useRef(null);
+  const pollingRef                = useRef(false);
 
   // Poll unread count every 30s
   useEffect(() => {
-    const load = () => fetchUnreadCount().then((r) => setCount(r.data.count)).catch(() => {});
+    let active = true;
+    let timeoutId = null;
+
+    const load = async () => {
+      if (pollingRef.current) return;
+      pollingRef.current = true;
+      try {
+        const r = await fetchUnreadCount();
+        if (active) setCount(r.data.count);
+      } catch { /* ignore */ }
+      finally {
+        pollingRef.current = false;
+        if (active) timeoutId = setTimeout(load, 30000);
+      }
+    };
+
     load();
-    const interval = setInterval(load, 30000);
-    return () => clearInterval(interval);
+    return () => { active = false; clearTimeout(timeoutId); };
   }, []);
 
   // Close on outside click

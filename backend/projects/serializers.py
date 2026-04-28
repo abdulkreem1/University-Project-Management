@@ -40,7 +40,8 @@ class ProjectIdeaSerializer(serializers.ModelSerializer):
                 'username': inv.invitee.username,
                 'name': inv.invitee.get_full_name() or inv.invitee.username,
             }
-            for inv in app.invitations.filter(status='accepted')
+            for inv in app.invitations.all()
+            if inv.status == 'accepted'
         ]
         return {'leader': leader, 'members': members}
 

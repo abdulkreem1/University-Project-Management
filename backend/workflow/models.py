@@ -1,4 +1,5 @@
 from django.db import models
+from django.db.models import Q
 from django.conf import settings
 from accounts.models import DEPARTMENTS
 
@@ -39,6 +40,10 @@ class WorkflowTemplate(models.Model):
 
     class Meta:
         ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['department', 'status', '-created_at']),
+            models.Index(fields=['created_by', 'status']),
+        ]
 
     def __str__(self):
         return f"{self.name} ({self.department})"
@@ -68,6 +73,9 @@ class WorkflowStage(models.Model):
 
     class Meta:
         ordering = ['order']
+        indexes = [
+            models.Index(fields=['template', 'order']),
+        ]
 
     def __str__(self):
         return f"{self.template.name} - {self.name}"
@@ -115,6 +123,17 @@ class ProjectWorkflow(models.Model):
 
     class Meta:
         ordering = ['-started_at']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['project_board_id'],
+                condition=Q(is_active=True),
+                name='unique_active_workflow_per_project_board',
+            ),
+        ]
+        indexes = [
+            models.Index(fields=['project_board_id', 'is_active']),
+            models.Index(fields=['template', 'is_active']),
+        ]
 
     def __str__(self):
         return f"Workflow for Project {self.project_board_id}"
@@ -157,6 +176,10 @@ class WorkflowStageInstance(models.Model):
     class Meta:
         ordering = ['stage__order']
         unique_together = ('project_workflow', 'stage')
+        indexes = [
+            models.Index(fields=['project_workflow', 'status']),
+            models.Index(fields=['stage', 'status']),
+        ]
 
     def __str__(self):
         return f"{self.stage.name} - Project {self.project_workflow.project_board_id}"

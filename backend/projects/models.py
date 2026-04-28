@@ -40,6 +40,13 @@ class ProjectIdea(models.Model):
     created_at      = models.DateTimeField(auto_now_add=True)
     updated_at      = models.DateTimeField(auto_now=True)
 
+    class Meta:
+        indexes = [
+            models.Index(fields=['doctor', 'status']),
+            models.Index(fields=['department', 'status', '-created_at']),
+            models.Index(fields=['status', '-created_at']),
+        ]
+
     def __str__(self):
         return f"[Doctor] {self.title} ({self.doctor.username})"
 
@@ -69,6 +76,13 @@ class StudentIdeaProposal(models.Model):
     created_at       = models.DateTimeField(auto_now_add=True)
     updated_at       = models.DateTimeField(auto_now=True)
 
+    class Meta:
+        indexes = [
+            models.Index(fields=['student', 'status']),
+            models.Index(fields=['supervisor', 'status', '-created_at']),
+            models.Index(fields=['department', 'status', '-created_at']),
+        ]
+
     def __str__(self):
         return f"[Student] {self.title} ({self.student.username})"
 
@@ -94,6 +108,10 @@ class ProposalInvitation(models.Model):
 
     class Meta:
         unique_together = ('proposal', 'invitee')
+        indexes = [
+            models.Index(fields=['invitee', 'status']),
+            models.Index(fields=['proposal', 'status']),
+        ]
 
     def __str__(self):
         return f"ProposalInvite: {self.invitee.username} → {self.proposal.title} [{self.status}]"
@@ -115,6 +133,11 @@ class ProjectApplication(models.Model):
     )
     status      = models.CharField(max_length=20, choices=STATUS_CHOICES, default='accepted')
     created_at  = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['student', 'status']),
+        ]
 
     def __str__(self):
         return f"Application: {self.student.username} — {self.proposal.title}"
@@ -159,6 +182,11 @@ class IdeaApplication(models.Model):
                 name='unique_registered_application_per_idea',
             ),
         ]
+        indexes = [
+            models.Index(fields=['student', 'status']),
+            models.Index(fields=['idea', 'status']),
+            models.Index(fields=['status', '-created_at']),
+        ]
 
     def __str__(self):
         return f"{self.student.username} → {self.idea.title} [{self.status}]"
@@ -190,6 +218,10 @@ class TeamInvitation(models.Model):
 
     class Meta:
         unique_together = ('application', 'invitee')
+        indexes = [
+            models.Index(fields=['invitee', 'status']),
+            models.Index(fields=['application', 'status']),
+        ]
 
     def __str__(self):
         return f"Invite: {self.invitee.username} → {self.application.idea.title} [{self.status}]"

@@ -45,6 +45,7 @@ export default function BrowseIdeas({ onBack }) {
   // Dynamic form state for apply modal
   const [dynForm, setDynForm]       = useState(null);
   const [dynValues, setDynValues]   = useState({});
+  const [loadingDynForm, setLoadingDynForm] = useState(false);
 
   useEffect(() => {
     Promise.all([browseIdeas(), fetchMyIdeaApplication(), fetchMyProposal()])
@@ -68,6 +69,7 @@ export default function BrowseIdeas({ onBack }) {
     setApplyError('');
     setDynForm(null);
     setDynValues({});
+    setLoadingDynForm(true);
     // Load dynamic form for this idea's department
     fetchStudentForm(idea.department, 'browse')
       .then(res => {
@@ -78,7 +80,8 @@ export default function BrowseIdeas({ onBack }) {
           setDynValues(init);
         }
       })
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => setLoadingDynForm(false));
   };
 
   const handleTeamSizeChange = (size) => {
@@ -95,6 +98,7 @@ export default function BrowseIdeas({ onBack }) {
   };
 
   const handleApplySubmit = async () => {
+    if (applying || loadingDynForm) return;
     setApplyError('');
     setApplying(true);
     try {
@@ -307,6 +311,9 @@ export default function BrowseIdeas({ onBack }) {
               ))}
 
               {/* Dynamic fields from HoD */}
+              {loadingDynForm && (
+                <div className="browse-loading" style={{ margin: '8px 0' }}>Loading department form...</div>
+              )}
               {dynForm && (dynForm.fields || []).length > 0 && (
                 <div style={{borderTop:'1px solid #e2e8f0', paddingTop:16, marginTop:8, display:'flex', flexDirection:'column', gap:14}}>
                   <div style={{fontSize:12, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.06em', color:'#64748b'}}>
@@ -332,10 +339,10 @@ export default function BrowseIdeas({ onBack }) {
             )}
 
             <div className="sv-modal-actions">
-              <button className="btn btn-primary btn-submit-modern" onClick={handleApplySubmit} disabled={applying}>
-                 <span>{applying ? 'Submitting…' : 'Confirm Application'}</span>
+              <button className="btn btn-primary btn-submit-modern" onClick={handleApplySubmit} disabled={applying || loadingDynForm}>
+                 <span>{applying ? 'Submitting…' : loadingDynForm ? 'Loading form…' : 'Confirm Application'}</span>
               </button>
-              <button className="btn btn-outline" style={{padding: '14px 28px', borderRadius: '8px', fontWeight: 700}} onClick={() => setApplyModal(null)}>Cancel</button>
+              <button className="btn btn-outline" style={{padding: '14px 28px', borderRadius: '8px', fontWeight: 700}} onClick={() => setApplyModal(null)} disabled={applying}>Cancel</button>
             </div>
           </div>
         </div>

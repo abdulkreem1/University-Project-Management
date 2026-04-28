@@ -82,10 +82,6 @@ def student_can_propose(student):
 
 def create_student_proposal(*, student, supervisor, title, description, department,
                              team_size, team_size_reason, member_ids):
-    allowed, error = student_can_propose(student)
-    if not allowed:
-        return {'ok': False, 'error': error}
-
     if not supervisor or supervisor.role != 'doctor':
         return {'ok': False, 'error': 'Supervisor must be a doctor.'}
 
@@ -97,40 +93,53 @@ def create_student_proposal(*, student, supervisor, title, description, departme
     if len(member_ids) != expected_members:
         return {'ok': False, 'error': f'Please provide {expected_members} additional member ID(s).'}
 
-    # Validate members
-    members = []
-    for uid in member_ids:
-        try:
-            m = User.objects.get(username=str(uid), role='student')
-        except User.DoesNotExist:
-            return {'ok': False, 'error': f'Student with ID "{uid}" not found.'}
-        if m == student:
-            return {'ok': False, 'error': 'You cannot add yourself as a team member.'}
-        active, err = _student_is_active(m)
-        if active:
-            return {'ok': False, 'error': f'Student "{uid}": {err}'}
-        members.append(m)
+    member_usernames = [str(uid) for uid in member_ids]
+    if len(member_usernames) != len(set(member_usernames)):
+        return {'ok': False, 'error': 'Duplicate team members are not allowed.'}
 
-    initial_status = 'awaiting_members'  # always wait for members since team_size >= 2
+    with transaction.atomic():
+        student = User.objects.select_for_update().get(pk=student.pk)
+        allowed, error = student_can_propose(student)
+        if not allowed:
+            return {'ok': False, 'error': error}
 
-    proposal = StudentIdeaProposal.objects.create(
-        student=student, supervisor=supervisor, title=title,
-        description=description, department=department,
-        team_size=team_size, team_size_reason=team_size_reason,
-        status=initial_status,
-    )
+        members_by_username = {
+            user.username: user
+            for user in User.objects.select_for_update().filter(username__in=member_usernames, role='student')
+        }
 
-    for m in members:
-        ProposalInvitation.objects.create(proposal=proposal, invitee=m, status='pending')
-        notify(m, 'invitation_received',
-               'Team Invitation Received 📨',
-               f'{student.get_full_name() or student.username} invited you to join their project proposal "{title}".')
+        members = []
+        for uid in member_usernames:
+            m = members_by_username.get(uid)
+            if not m:
+                return {'ok': False, 'error': f'Student with ID "{uid}" not found.'}
+            if m.pk == student.pk:
+                return {'ok': False, 'error': 'You cannot add yourself as a team member.'}
+            active, err = _student_is_active(m)
+            if active:
+                return {'ok': False, 'error': f'Student "{uid}": {err}'}
+            members.append(m)
 
-    # If going straight to supervisor, notify them
-    if initial_status == 'pending_supervisor':
-        notify(supervisor, 'proposal_submitted',
-               'New Student Proposal',
-               f'{student.get_full_name() or student.username} submitted a proposal "{title}" with you as supervisor.')
+        initial_status = 'awaiting_members'  # always wait for members since team_size >= 2
+
+        proposal = StudentIdeaProposal.objects.create(
+            student=student, supervisor=supervisor, title=title,
+            description=description, department=department,
+            team_size=team_size, team_size_reason=team_size_reason,
+            status=initial_status,
+        )
+
+        for m in members:
+            ProposalInvitation.objects.create(proposal=proposal, invitee=m, status='pending')
+            notify(m, 'invitation_received',
+                   'Team Invitation Received 📨',
+                   f'{student.get_full_name() or student.username} invited you to join their project proposal "{title}".')
+
+        # If going straight to supervisor, notify them
+        if initial_status == 'pending_supervisor':
+            notify(supervisor, 'proposal_submitted',
+                   'New Student Proposal',
+                   f'{student.get_full_name() or student.username} submitted a proposal "{title}" with you as supervisor.')
 
     return {'ok': True, 'proposal': proposal}
 
@@ -165,6 +174,7 @@ def respond_to_proposal_invitation(*, invitation, action):
             'proposal__student', 'proposal__supervisor', 'invitee'
         ).get(pk=invitation.pk)
         proposal = StudentIdeaProposal.objects.select_for_update().get(pk=invitation.proposal_id)
+        User.objects.select_for_update().filter(pk=invitation.invitee_id).first()
 
         if invitation.status != 'pending':
             return {'ok': False, 'error': 'Invitation already responded to.'}
@@ -209,138 +219,150 @@ def respond_to_proposal_invitation(*, invitation, action):
 
 def replace_proposal_member(*, proposal, old_member_id, new_member_id):
     """Leader replaces a rejected invitee with a new one."""
-    if proposal.status != 'awaiting_members':
-        return {'ok': False, 'error': 'Proposal is not in awaiting members state.'}
+    with transaction.atomic():
+        proposal = StudentIdeaProposal.objects.select_for_update().select_related('student').get(pk=proposal.pk)
+        if proposal.status != 'awaiting_members':
+            return {'ok': False, 'error': 'Proposal is not in awaiting members state.'}
 
-    try:
-        old_inv = proposal.invitations.get(invitee__username=old_member_id, status='rejected')
-    except ProposalInvitation.DoesNotExist:
-        return {'ok': False, 'error': 'No rejected invitation found for this member.'}
+        try:
+            old_inv = proposal.invitations.select_for_update().get(invitee__username=old_member_id, status='rejected')
+        except ProposalInvitation.DoesNotExist:
+            return {'ok': False, 'error': 'No rejected invitation found for this member.'}
 
-    try:
-        new_member = User.objects.get(username=str(new_member_id), role='student')
-    except User.DoesNotExist:
-        return {'ok': False, 'error': f'Student with ID "{new_member_id}" not found.'}
+        try:
+            new_member = User.objects.select_for_update().get(username=str(new_member_id), role='student')
+        except User.DoesNotExist:
+            return {'ok': False, 'error': f'Student with ID "{new_member_id}" not found.'}
 
-    if new_member == proposal.student:
-        return {'ok': False, 'error': 'You cannot add yourself as a team member.'}
+        if new_member.pk == proposal.student_id:
+            return {'ok': False, 'error': 'You cannot add yourself as a team member.'}
 
-    active, err = _student_is_active(new_member)
-    if active:
-        return {'ok': False, 'error': f'Student "{new_member_id}": {err}'}
+        active, err = _student_is_active(new_member)
+        if active:
+            return {'ok': False, 'error': f'Student "{new_member_id}": {err}'}
 
-    # Remove old rejected invitation and create new one
-    old_inv.delete()
-    ProposalInvitation.objects.create(proposal=proposal, invitee=new_member, status='pending')
-    notify(new_member, 'invitation_received',
-           'Team Invitation Received 📨',
-           f'{proposal.student.get_full_name() or proposal.student.username} invited you to join their project proposal "{proposal.title}".')
+        # Remove old rejected invitation and create new one
+        old_inv.delete()
+        ProposalInvitation.objects.create(proposal=proposal, invitee=new_member, status='pending')
+        notify(new_member, 'invitation_received',
+               'Team Invitation Received 📨',
+               f'{proposal.student.get_full_name() or proposal.student.username} invited you to join their project proposal "{proposal.title}".')
 
     return {'ok': True}
 
 
 def replace_application_member(*, application, old_member_id, new_member_id):
     """Leader replaces a rejected invitee with a new one in an IdeaApplication."""
-    if application.status != 'awaiting_members':
-        return {'ok': False, 'error': 'Application is not in awaiting members state.'}
+    with transaction.atomic():
+        application = IdeaApplication.objects.select_for_update().select_related('student', 'idea').get(pk=application.pk)
+        if application.status != 'awaiting_members':
+            return {'ok': False, 'error': 'Application is not in awaiting members state.'}
 
-    try:
-        old_inv = application.invitations.get(invitee__username=old_member_id, status='rejected')
-    except TeamInvitation.DoesNotExist:
-        return {'ok': False, 'error': 'No rejected invitation found for this member.'}
+        try:
+            old_inv = application.invitations.select_for_update().get(invitee__username=old_member_id, status='rejected')
+        except TeamInvitation.DoesNotExist:
+            return {'ok': False, 'error': 'No rejected invitation found for this member.'}
 
-    try:
-        new_member = User.objects.get(username=str(new_member_id), role='student')
-    except User.DoesNotExist:
-        return {'ok': False, 'error': f'Student with ID "{new_member_id}" not found.'}
+        try:
+            new_member = User.objects.select_for_update().get(username=str(new_member_id), role='student')
+        except User.DoesNotExist:
+            return {'ok': False, 'error': f'Student with ID "{new_member_id}" not found.'}
 
-    if new_member == application.student:
-        return {'ok': False, 'error': 'You cannot add yourself as a team member.'}
+        if new_member.pk == application.student_id:
+            return {'ok': False, 'error': 'You cannot add yourself as a team member.'}
 
-    active, err = _student_is_active(new_member)
-    if active:
-        return {'ok': False, 'error': f'Student "{new_member_id}": {err}'}
+        active, err = _student_is_active(new_member)
+        if active:
+            return {'ok': False, 'error': f'Student "{new_member_id}": {err}'}
 
-    old_inv.delete()
-    TeamInvitation.objects.create(application=application, invitee=new_member, status='pending')
-    notify(new_member, 'invitation_received',
-           'Team Invitation Received 📨',
-           f'{application.student.get_full_name() or application.student.username} invited you to join their application for "{application.idea.title}".')
+        old_inv.delete()
+        TeamInvitation.objects.create(application=application, invitee=new_member, status='pending')
+        notify(new_member, 'invitation_received',
+               'Team Invitation Received 📨',
+               f'{application.student.get_full_name() or application.student.username} invited you to join their application for "{application.idea.title}".')
 
     return {'ok': True}
 
 
 def supervisor_review_proposal(*, proposal, action, rejection_reason=''):
-    if proposal.status != 'pending_supervisor':
-        return {'ok': False, 'error': 'Proposal is not awaiting supervisor approval.'}
-    if action == 'approve':
-        proposal.status = 'pending_hod'
-        proposal.save(update_fields=['status', 'updated_at'])
-        notify(proposal.student, 'proposal_approved_sup',
-               'Proposal Approved by Supervisor',
-               f'Your proposal "{proposal.title}" was approved by the supervisor and is now pending HoD review.')
-        # Notify HoD
-        from django.contrib.auth import get_user_model
-        U = get_user_model()
-        hods = U.objects.filter(role='hod', department=proposal.department)
-        notify_many(hods, 'proposal_submitted',
-                    'Student Proposal Pending Review',
-                    f'Proposal "{proposal.title}" by {proposal.student.get_full_name() or proposal.student.username} is awaiting your review.')
-    else:
-        proposal.status = 'rejected'
-        proposal.rejection_reason = rejection_reason
-        proposal.save(update_fields=['status', 'rejection_reason', 'updated_at'])
-        proposal.invitations.filter(status='accepted').update(status='rejected')
-        notify(proposal.student, 'proposal_rejected',
-               'Proposal Rejected',
-               f'Your proposal "{proposal.title}" was rejected by the supervisor. Reason: {rejection_reason}')
-    return {'ok': True, 'proposal': proposal}
+    with transaction.atomic():
+        proposal = StudentIdeaProposal.objects.select_for_update().select_related(
+            'student', 'supervisor'
+        ).get(pk=proposal.pk)
+        if proposal.status != 'pending_supervisor':
+            return {'ok': False, 'error': 'Proposal is not awaiting supervisor approval.'}
+        if action == 'approve':
+            proposal.status = 'pending_hod'
+            proposal.save(update_fields=['status', 'updated_at'])
+            notify(proposal.student, 'proposal_approved_sup',
+                   'Proposal Approved by Supervisor',
+                   f'Your proposal "{proposal.title}" was approved by the supervisor and is now pending HoD review.')
+            # Notify HoD
+            from django.contrib.auth import get_user_model
+            U = get_user_model()
+            hods = U.objects.filter(role='hod', department=proposal.department)
+            notify_many(hods, 'proposal_submitted',
+                        'Student Proposal Pending Review',
+                        f'Proposal "{proposal.title}" by {proposal.student.get_full_name() or proposal.student.username} is awaiting your review.')
+        else:
+            proposal.status = 'rejected'
+            proposal.rejection_reason = rejection_reason
+            proposal.save(update_fields=['status', 'rejection_reason', 'updated_at'])
+            proposal.invitations.filter(status='accepted').update(status='rejected')
+            notify(proposal.student, 'proposal_rejected',
+                   'Proposal Rejected',
+                   f'Your proposal "{proposal.title}" was rejected by the supervisor. Reason: {rejection_reason}')
+        return {'ok': True, 'proposal': proposal}
 
 
 def hod_review_proposal(*, proposal, action, rejection_reason=''):
-    if proposal.status != 'pending_hod':
-        return {'ok': False, 'error': 'Proposal is not awaiting HoD review.'}
-    if action == 'reject':
-        proposal.status = 'rejected'
-        proposal.rejection_reason = rejection_reason
-        proposal.save(update_fields=['status', 'rejection_reason', 'updated_at'])
-        proposal.invitations.filter(status='accepted').update(status='rejected')
-        notify(proposal.student, 'proposal_rejected',
-               'Proposal Rejected by HoD',
-               f'Your proposal "{proposal.title}" was rejected by the HoD. Reason: {rejection_reason}')
+    with transaction.atomic():
+        proposal = StudentIdeaProposal.objects.select_for_update().select_related('student').get(pk=proposal.pk)
+        if proposal.status != 'pending_hod':
+            return {'ok': False, 'error': 'Proposal is not awaiting HoD review.'}
+        if action == 'reject':
+            proposal.status = 'rejected'
+            proposal.rejection_reason = rejection_reason
+            proposal.save(update_fields=['status', 'rejection_reason', 'updated_at'])
+            proposal.invitations.filter(status='accepted').update(status='rejected')
+            notify(proposal.student, 'proposal_rejected',
+                   'Proposal Rejected by HoD',
+                   f'Your proposal "{proposal.title}" was rejected by the HoD. Reason: {rejection_reason}')
+            return {'ok': True, 'proposal': proposal}
+        proposal.status = 'assigned'
+        proposal.save(update_fields=['status', 'updated_at'])
+        ProjectApplication.objects.create(proposal=proposal, student=proposal.student, status='accepted')
+        notify(proposal.student, 'proposal_assigned',
+               'Project Assigned 🎉',
+               f'Your proposal "{proposal.title}" has been approved and assigned to you!')
+        # Notify accepted members
+        accepted_invitees = [inv.invitee for inv in proposal.invitations.filter(status='accepted').select_related('invitee')]
+        notify_many(accepted_invitees, 'proposal_assigned',
+                    'Project Assigned 🎉',
+                    f'The proposal "{proposal.title}" you joined has been approved and registered!')
         return {'ok': True, 'proposal': proposal}
-    proposal.status = 'assigned'
-    proposal.save(update_fields=['status', 'updated_at'])
-    ProjectApplication.objects.create(proposal=proposal, student=proposal.student, status='accepted')
-    notify(proposal.student, 'proposal_assigned',
-           'Project Assigned 🎉',
-           f'Your proposal "{proposal.title}" has been approved and assigned to you!')
-    # Notify accepted members
-    accepted_invitees = [inv.invitee for inv in proposal.invitations.filter(status='accepted')]
-    notify_many(accepted_invitees, 'proposal_assigned',
-                'Project Assigned 🎉',
-                f'The proposal "{proposal.title}" you joined has been approved and registered!')
-    return {'ok': True, 'proposal': proposal}
 
 
 def hod_review_doctor_idea(*, idea, action, rejection_reason=''):
-    if idea.status != 'pending_review':
-        return {'ok': False, 'error': 'Idea is not pending review.'}
-    if action == 'approve':
-        idea.status = 'approved'
-        idea.rejection_reason = ''
-        idea.save(update_fields=['status', 'rejection_reason', 'updated_at'])
-        notify(idea.doctor, 'idea_approved',
-               'Project Idea Approved ✅',
-               f'Your idea "{idea.title}" has been approved by the HoD and is now visible to students.')
-    else:
-        idea.status = 'rejected'
-        idea.rejection_reason = rejection_reason
-        idea.save(update_fields=['status', 'rejection_reason', 'updated_at'])
-        notify(idea.doctor, 'idea_rejected',
-               'Project Idea Rejected',
-               f'Your idea "{idea.title}" was rejected by the HoD. Reason: {rejection_reason}')
-    return {'ok': True, 'idea': idea}
+    with transaction.atomic():
+        idea = ProjectIdea.objects.select_for_update().select_related('doctor').get(pk=idea.pk)
+        if idea.status != 'pending_review':
+            return {'ok': False, 'error': 'Idea is not pending review.'}
+        if action == 'approve':
+            idea.status = 'approved'
+            idea.rejection_reason = ''
+            idea.save(update_fields=['status', 'rejection_reason', 'updated_at'])
+            notify(idea.doctor, 'idea_approved',
+                   'Project Idea Approved ✅',
+                   f'Your idea "{idea.title}" has been approved by the HoD and is now visible to students.')
+        else:
+            idea.status = 'rejected'
+            idea.rejection_reason = rejection_reason
+            idea.save(update_fields=['status', 'rejection_reason', 'updated_at'])
+            notify(idea.doctor, 'idea_rejected',
+                   'Project Idea Rejected',
+                   f'Your idea "{idea.title}" was rejected by the HoD. Reason: {rejection_reason}')
+        return {'ok': True, 'idea': idea}
 
 
 # ── UC-03: Student applies on a doctor idea ───────────────────────────────────
@@ -356,6 +378,7 @@ def apply_on_idea(*, student, idea, team_size, member_ids):
     with transaction.atomic():
         # Lock the idea row to prevent race conditions
         idea = ProjectIdea.objects.select_for_update().get(pk=idea.pk)
+        student = User.objects.select_for_update().get(pk=student.pk)
 
         if idea.status != 'approved':
             return {'ok': False, 'error': 'This idea is not available for applications.'}
@@ -372,18 +395,25 @@ def apply_on_idea(*, student, idea, team_size, member_ids):
         if len(member_ids) != team_size - 1:
             return {'ok': False, 'error': f'Please provide {team_size - 1} additional member ID(s).'}
 
+        member_usernames = [str(uid) for uid in member_ids]
+        if len(member_usernames) != len(set(member_usernames)):
+            return {'ok': False, 'error': 'Duplicate team members are not allowed.'}
+
         allowed, error = student_can_apply(student)
         if not allowed:
             return {'ok': False, 'error': error}
 
         # Validate members
+        members_by_username = {
+            user.username: user
+            for user in User.objects.select_for_update().filter(username__in=member_usernames, role='student')
+        }
         members = []
-        for uid in member_ids:
-            try:
-                m = User.objects.get(username=str(uid), role='student')
-            except User.DoesNotExist:
+        for uid in member_usernames:
+            m = members_by_username.get(uid)
+            if not m:
                 return {'ok': False, 'error': f'Student with ID "{uid}" not found.'}
-            if m == student:
+            if m.pk == student.pk:
                 return {'ok': False, 'error': 'You cannot add yourself as a team member.'}
             ok, err = student_can_apply(m)
             if not ok:
@@ -409,6 +439,7 @@ def respond_to_invitation(*, invitation, action):
             'application__idea__doctor', 'application__student', 'invitee'
         ).get(pk=invitation.pk)
         app = IdeaApplication.objects.select_for_update().get(pk=invitation.application_id)
+        User.objects.select_for_update().filter(pk=invitation.invitee_id).first()
 
         if invitation.status != 'pending':
             return {'ok': False, 'error': 'Invitation already responded to.'}

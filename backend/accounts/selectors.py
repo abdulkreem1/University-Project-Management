@@ -17,6 +17,7 @@ def get_doctors() -> list:
     return list(
         User.objects.filter(role__in=['doctor', 'hod'])
         .values('id', 'username', 'first_name', 'last_name', 'department', 'role')
+        [:500]
     )
 
 

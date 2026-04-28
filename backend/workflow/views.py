@@ -1,7 +1,7 @@
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from datetime import datetime, timedelta
 
 from .models import WorkflowTemplate, WorkflowStage, ProjectWorkflow, WorkflowStageInstance
@@ -12,6 +12,47 @@ from .serializers import (
 from .permissions import IsHodOrDoctor, IsHod, IsStudent
 
 
+def _get_project_board(project_board_id):
+    from project_management.models import ProjectBoard
+
+    return ProjectBoard.objects.select_related(
+        'proposal__supervisor',
+        'proposal__student',
+        'application__idea__doctor',
+        'application__student',
+    ).get(id=project_board_id)
+
+
+def _project_department_and_supervisor(project_board):
+    if project_board.proposal:
+        return project_board.proposal.department, project_board.proposal.supervisor
+    if project_board.application and project_board.application.idea:
+        return project_board.application.idea.department, project_board.application.idea.doctor
+    return None, None
+
+
+def _user_can_access_project(user, project_board):
+    department, supervisor = _project_department_and_supervisor(project_board)
+    if user.role == 'dean':
+        return True
+    if user.role == 'hod':
+        return department == user.department
+    if user.role == 'doctor':
+        return supervisor == user
+    if user.role == 'student':
+        return project_board.members.filter(pk=user.pk).exists()
+    return False
+
+
+def _user_can_apply_workflow(user, project_board):
+    department, supervisor = _project_department_and_supervisor(project_board)
+    if user.role == 'hod':
+        return department == user.department
+    if user.role == 'doctor':
+        return supervisor == user
+    return False
+
+
 # ── HoD/Doctor: Manage Workflow Templates ────────────────────────────────────
 
 @api_view(['GET'])
@@ -20,7 +61,7 @@ def list_workflow_templates(request):
     """List all workflow templates for the user's department."""
     templates = WorkflowTemplate.objects.filter(
         department=request.user.department
-    ).prefetch_related('stages', 'stages__fields')
+    ).prefetch_related('stages', 'stages__fields')[:100]
     return Response(WorkflowTemplateSerializer(templates, many=True).data)
 
 
@@ -166,57 +207,30 @@ def apply_workflow_to_project(request):
     except WorkflowTemplate.DoesNotExist:
         return Response({'error': 'Template not found'}, status=404)
     
-    # Check if workflow already exists for this project
-    if ProjectWorkflow.objects.filter(project_board_id=project_board_id, is_active=True).exists():
-        return Response({'error': 'Project already has an active workflow'}, status=400)
-    
-    # Verify user has permission to apply workflow to this project
-    # Import here to avoid circular imports
     from project_management.models import ProjectBoard
-    
+
     try:
-        project_board = ProjectBoard.objects.select_related(
-            'proposal__supervisor',
-            'application__idea__doctor'
-        ).get(id=project_board_id)
-        
-        # Get department and supervisor from proposal or application
-        department = None
-        supervisor = None
-        
-        if project_board.proposal:
-            department = project_board.proposal.department
-            supervisor = project_board.proposal.supervisor
-        elif project_board.application:
-            # For applications, get department from the idea itself, not from doctor
-            if project_board.application.idea:
-                department = project_board.application.idea.department
-                supervisor = project_board.application.idea.doctor
-        
-        # Check if department was found
+        project_board = _get_project_board(project_board_id)
+        department, _ = _project_department_and_supervisor(project_board)
         if not department:
             return Response({'error': 'Could not determine project department'}, status=400)
-        
-        # HoD can apply to any project in their department
-        if request.user.role == 'hod':
-            if department != request.user.department:
-                return Response({'error': 'You can only apply workflows to projects in your department'}, status=403)
-        
-        # Doctor can only apply to projects they supervise
-        elif request.user.role == 'doctor':
-            if supervisor != request.user:
-                return Response({'error': 'You can only apply workflows to projects you supervise'}, status=403)
-        
+        if not _user_can_apply_workflow(request.user, project_board):
+            return Response({'error': 'You cannot apply workflows to this project'}, status=403)
     except ProjectBoard.DoesNotExist:
         return Response({'error': 'Project not found'}, status=404)
     
     with transaction.atomic():
-        # Create project workflow
-        project_workflow = ProjectWorkflow.objects.create(
-            project_board_id=project_board_id,
-            template=template,
-            is_active=True
-        )
+        if ProjectWorkflow.objects.select_for_update().filter(project_board_id=project_board_id, is_active=True).exists():
+            return Response({'error': 'Project already has an active workflow'}, status=400)
+
+        try:
+            project_workflow = ProjectWorkflow.objects.create(
+                project_board_id=project_board_id,
+                template=template,
+                is_active=True
+            )
+        except IntegrityError:
+            return Response({'error': 'Project already has an active workflow'}, status=400)
         
         # Create stage instances
         project_start_date = datetime.now().date()
@@ -249,6 +263,16 @@ def apply_workflow_to_project(request):
 @permission_classes([IsAuthenticated])
 def get_project_workflow(request, project_board_id):
     """Get the workflow for a specific project."""
+    from project_management.models import ProjectBoard
+
+    try:
+        project_board = _get_project_board(project_board_id)
+    except ProjectBoard.DoesNotExist:
+        return Response({'error': 'Project not found'}, status=404)
+
+    if not _user_can_access_project(request.user, project_board):
+        return Response({'error': 'Not allowed to view this workflow'}, status=403)
+
     try:
         workflow = ProjectWorkflow.objects.prefetch_related(
             'stage_instances__stage__fields',
@@ -275,14 +299,37 @@ def submit_workflow_stage(request, stage_instance_id):
     try:
         stage_instance = WorkflowStageInstance.objects.select_related(
             'stage', 'project_workflow'
+        ).prefetch_related(
+            'stage__fields'
         ).get(id=stage_instance_id)
     except WorkflowStageInstance.DoesNotExist:
         return Response({'error': 'Stage instance not found'}, status=404)
+
+    from project_management.models import ProjectBoard
+
+    try:
+        project_board = _get_project_board(stage_instance.project_workflow.project_board_id)
+    except ProjectBoard.DoesNotExist:
+        return Response({'error': 'Project not found'}, status=404)
+
+    if request.user.role != 'student' or not project_board.members.filter(pk=request.user.pk).exists():
+        return Response({'error': 'Not allowed to submit this workflow stage'}, status=403)
     
     field_responses = request.data.get('field_responses', {})
+    if not isinstance(field_responses, dict):
+        return Response({'error': 'field_responses must be an object'}, status=400)
+
+    fields_by_id = {str(field.id): field for field in stage_instance.stage.fields.all()}
+    for field_id in field_responses.keys():
+        if str(field_id) not in fields_by_id:
+            return Response({'error': f'Invalid field for this stage: {field_id}'}, status=400)
+    for field in fields_by_id.values():
+        if field.required and not field_responses.get(str(field.id)):
+            return Response({'error': f'Field is required: {field.label}'}, status=400)
     
     with transaction.atomic():
         from .models import WorkflowFieldResponse
+        stage_instance = WorkflowStageInstance.objects.select_for_update().get(pk=stage_instance.pk)
         
         # Delete existing responses for this stage instance
         stage_instance.field_responses.all().delete()
@@ -332,6 +379,7 @@ def review_workflow_stage(request, stage_instance_id):
         return Response({'error': 'Invalid action'}, status=400)
     
     with transaction.atomic():
+        stage_instance = WorkflowStageInstance.objects.select_for_update().get(pk=stage_instance.pk)
         stage_instance.status = 'approved' if action == 'approve' else 'rejected'
         stage_instance.feedback = feedback
         stage_instance.reviewed_by = request.user
@@ -346,11 +394,7 @@ def review_workflow_stage(request, stage_instance_id):
 def get_available_projects(request):
     """Get projects that the user can apply workflows to."""
     from project_management.models import ProjectBoard
-    from projects.models import StudentIdeaProposal, IdeaApplication
-    
-    print(f"[DEBUG] User: {request.user.username}, Role: {request.user.role}, Department: {request.user.department}")
-    
-    # Get all project boards
+
     projects = ProjectBoard.objects.select_related(
         'proposal__supervisor',
         'proposal__student',
@@ -360,53 +404,35 @@ def get_available_projects(request):
         'proposal__invitations',
         'application__invitations'
     )
-    
-    print(f"[DEBUG] Total projects found: {projects.count()}")
-    
+
+    project_list = list(projects[:500])
+    active_workflows = {
+        workflow.project_board_id: workflow
+        for workflow in ProjectWorkflow.objects.filter(
+            project_board_id__in=[project.id for project in project_list],
+            is_active=True,
+        ).select_related('template__created_by')
+    }
+
     # Filter based on user role
     filtered_projects = []
-    for project in projects:
-        print(f"\n[DEBUG] Processing project {project.id}: {project.title}")
-        print(f"[DEBUG] Has proposal: {project.proposal is not None}")
-        print(f"[DEBUG] Has application: {project.application is not None}")
-        
-        # Get department and supervisor from proposal or application
-        department = None
-        supervisor = None
-        
-        if project.proposal:
-            department = project.proposal.department
-            supervisor = project.proposal.supervisor
-            print(f"[DEBUG] Proposal - Department: {department}, Supervisor: {supervisor}")
-        elif project.application:
-            print(f"[DEBUG] Application exists")
-            print(f"[DEBUG] Application.idea: {project.application.idea}")
-            if project.application.idea:
-                # Get department from the idea itself, not from doctor
-                department = project.application.idea.department
-                supervisor = project.application.idea.doctor
-                print(f"[DEBUG] Application - Department: {department}, Supervisor: {supervisor}")
+    for project in project_list:
+        department, supervisor = _project_department_and_supervisor(project)
         
         # Skip if no department found
         if not department:
-            print(f"[DEBUG] Skipping project {project.id} - no department found")
             continue
         
         # Check permissions
         if request.user.role == 'hod':
             # HoD can see all projects in their department
             if department != request.user.department:
-                print(f"[DEBUG] Skipping project {project.id} - department mismatch (project: {department}, user: {request.user.department})")
                 continue
-            print(f"[DEBUG] HoD can see project {project.id}")
         elif request.user.role == 'doctor':
             # Doctor can only see projects they supervise
             if supervisor != request.user:
-                print(f"[DEBUG] Skipping project {project.id} - not supervisor (project supervisor: {supervisor}, user: {request.user})")
                 continue
-            print(f"[DEBUG] Doctor can see project {project.id}")
         else:
-            print(f"[DEBUG] Skipping project {project.id} - invalid role")
             continue
         
         # Get team members
@@ -418,20 +444,11 @@ def get_available_projects(request):
             })
         
         # Check if project already has workflow
-        has_workflow = ProjectWorkflow.objects.filter(
-            project_board_id=project.id,
-            is_active=True
-        ).exists()
+        workflow = active_workflows.get(project.id)
+        has_workflow = workflow is not None
         
         # Check if user created the workflow (for review purposes)
-        workflow_created_by_user = False
-        if has_workflow:
-            workflow = ProjectWorkflow.objects.filter(
-                project_board_id=project.id,
-                is_active=True
-            ).select_related('template__created_by').first()
-            if workflow and workflow.template.created_by == request.user:
-                workflow_created_by_user = True
+        workflow_created_by_user = bool(workflow and workflow.template.created_by == request.user)
         
         filtered_projects.append({
             'id': project.id,
@@ -442,9 +459,6 @@ def get_available_projects(request):
             'has_workflow': has_workflow,
             'can_review': workflow_created_by_user  # New field
         })
-        print(f"[DEBUG] Added project {project.id} to filtered list")
-    
-    print(f"\n[DEBUG] Total filtered projects: {len(filtered_projects)}")
     return Response(filtered_projects)
 
 
@@ -458,7 +472,7 @@ def get_reviewable_projects(request):
     workflows = ProjectWorkflow.objects.filter(
         template__created_by=request.user,
         is_active=True
-    ).select_related('template').values_list('project_board_id', flat=True)
+    ).select_related('template').values_list('project_board_id', flat=True)[:500]
     
     # Get project boards
     projects = ProjectBoard.objects.filter(

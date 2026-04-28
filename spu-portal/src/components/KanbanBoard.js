@@ -1,6 +1,6 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { createTask, updateTask, deleteTask,
-         fetchComments, postComment, deleteComment,
+         postComment, deleteComment,
          uploadAttachment, deleteAttachment,
          fetchBoardActivity } from '../api';
 import './KanbanBoard.css';
@@ -538,7 +538,7 @@ export default function KanbanBoard({ board, setBoard, canEdit = true }) {
             <div
               key={col.key}
               className={`kb-column ${isOver ? 'kb-column--over' : ''}`}
-              onDragOver={(e) => { e.preventDefault(); setDragOver(col.key); }}
+              onDragOver={(e) => { e.preventDefault(); setDragOver((prev) => prev === col.key ? prev : col.key); }}
               onDragLeave={() => setDragOver(null)}
               onDrop={() => onDrop(col.key)}
             >

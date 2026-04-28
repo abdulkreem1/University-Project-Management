@@ -3,6 +3,7 @@ import axios from 'axios';
 const API_BASE = 'http://localhost:8000';
 
 const api = axios.create({ baseURL: API_BASE });
+let refreshPromise = null;
 
 // Attach token to every request
 api.interceptors.request.use((config) => {
@@ -10,6 +11,43 @@ api.interceptors.request.use((config) => {
   if (token) config.headers.Authorization = `Bearer ${token}`;
   return config;
 });
+
+api.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    const original = error.config;
+    const status = error.response?.status;
+    const isTokenRequest = original?.url?.includes('/api/token/');
+
+    if (status !== 401 || !original || original._retry || isTokenRequest) {
+      return Promise.reject(error);
+    }
+
+    const refresh = localStorage.getItem('refresh');
+    if (!refresh) {
+      localStorage.removeItem('access');
+      return Promise.reject(error);
+    }
+
+    original._retry = true;
+    try {
+      if (!refreshPromise) {
+        refreshPromise = axios.post(`${API_BASE}/api/token/refresh/`, { refresh })
+          .finally(() => { refreshPromise = null; });
+      }
+      const res = await refreshPromise;
+      localStorage.setItem('access', res.data.access);
+      if (res.data.refresh) localStorage.setItem('refresh', res.data.refresh);
+      original.headers = original.headers || {};
+      original.headers.Authorization = `Bearer ${res.data.access}`;
+      return api(original);
+    } catch (refreshError) {
+      localStorage.removeItem('access');
+      localStorage.removeItem('refresh');
+      return Promise.reject(refreshError);
+    }
+  }
+);
 
 export const login = (username, password) =>
   api.post('/api/token/', { username, password });

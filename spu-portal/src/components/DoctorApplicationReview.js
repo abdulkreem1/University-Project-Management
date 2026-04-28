@@ -9,6 +9,7 @@ export default function DoctorApplicationReview({ onBack }) {
   const [reviewing, setReviewing] = useState(null);
   const [reason, setReason]       = useState('');
   const [actionError, setActionError] = useState('');
+  const [confirming, setConfirming]   = useState(false);
 
   useEffect(() => {
     fetchDoctorPendingApplications()
@@ -20,7 +21,9 @@ export default function DoctorApplicationReview({ onBack }) {
   const openReview = (id, action) => { setReviewing({ id, action }); setReason(''); setActionError(''); };
 
   const handleConfirm = async () => {
+    if (!reviewing || confirming) return;
     setActionError('');
+    setConfirming(true);
     try {
       await doctorReviewApplication(reviewing.id, { action: reviewing.action, rejection_reason: reason });
       setApps((prev) => prev.filter((a) => a.id !== reviewing.id));
@@ -28,6 +31,8 @@ export default function DoctorApplicationReview({ onBack }) {
     } catch (err) {
       const data = err.response?.data;
       setActionError(data?.rejection_reason?.[0] || data?.error || 'Something went wrong.');
+    } finally {
+      setConfirming(false);
     }
   };
 
@@ -80,8 +85,10 @@ export default function DoctorApplicationReview({ onBack }) {
             )}
             {actionError && <div className="alert alert-error">{actionError}</div>}
             <div className="sv-modal-actions">
-              <button className={`btn ${reviewing.action === 'approve' ? 'btn-primary' : 'btn-danger'}`} onClick={handleConfirm}>Confirm</button>
-              <button className="btn btn-outline" onClick={() => setReviewing(null)}>Cancel</button>
+              <button className={`btn ${reviewing.action === 'approve' ? 'btn-primary' : 'btn-danger'}`} onClick={handleConfirm} disabled={confirming}>
+                {confirming ? 'Processing...' : 'Confirm'}
+              </button>
+              <button className="btn btn-outline" onClick={() => setReviewing(null)} disabled={confirming}>Cancel</button>
             </div>
           </div>
         </div>

@@ -1,6 +1,9 @@
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+import os
+
+from django.db.models import Count, Q
 from .models import ProjectBoard, Task, TaskComment, TaskAttachment, ActivityLog
 from .serializers import (
     ProjectBoardSerializer, TaskSerializer,
@@ -9,6 +12,11 @@ from .serializers import (
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
+
+MAX_BOARD_LIST_SIZE = 100
+MAX_COMMENT_LIST_SIZE = 100
+MAX_ATTACHMENT_SIZE = 10 * 1024 * 1024
+ALLOWED_ATTACHMENT_EXTENSIONS = {'.pdf', '.doc', '.docx', '.xls', '.xlsx', '.png', '.jpg', '.jpeg', '.gif', '.txt'}
 
 def _get_student_board(student):
     from projects.models import StudentIdeaProposal, IdeaApplication, ProposalInvitation, TeamInvitation
@@ -44,13 +52,32 @@ def _get_student_board(student):
     return None
 
 
+def _board_detail_queryset():
+    return ProjectBoard.objects.select_related(
+        'proposal__supervisor',
+        'proposal__student',
+        'application__idea__doctor',
+        'application__student',
+    ).prefetch_related(
+        'tasks__assignee',
+        'tasks__created_by',
+        'tasks__comments__author',
+        'tasks__attachments__uploaded_by',
+    )
+
+
 def _get_board_for_member(user, board_id):
     try:
-        board = ProjectBoard.objects.get(pk=board_id)
+        board = ProjectBoard.objects.select_related(
+            'proposal__supervisor',
+            'proposal__student',
+            'application__idea__doctor',
+            'application__student',
+        ).get(pk=board_id)
     except ProjectBoard.DoesNotExist:
         return None
 
-    if user.role == 'student' and user in board.members:
+    if user.role == 'student' and board.members.filter(pk=user.pk).exists():
         return board
 
     if user.role == 'doctor':
@@ -76,6 +103,7 @@ def my_board(request):
     board = _get_student_board(request.user)
     if not board:
         return Response({'has_project': False})
+    board = _board_detail_queryset().get(pk=board.pk)
     return Response({'has_project': True, 'board': ProjectBoardSerializer(board).data})
 
 
@@ -88,7 +116,7 @@ def supervisor_boards(request):
     from projects.models import StudentIdeaProposal, IdeaApplication
     boards = []
 
-    for proposal in StudentIdeaProposal.objects.filter(supervisor=request.user, status='assigned'):
+    for proposal in StudentIdeaProposal.objects.filter(supervisor=request.user, status='assigned')[:MAX_BOARD_LIST_SIZE]:
         board, _ = ProjectBoard.objects.get_or_create(
             proposal=proposal, defaults={'title': proposal.title}
         )
@@ -96,12 +124,15 @@ def supervisor_boards(request):
 
     for application in IdeaApplication.objects.filter(
         idea__doctor=request.user, status='registered'
-    ).select_related('idea'):
+    ).select_related('idea')[:MAX_BOARD_LIST_SIZE]:
+        if len(boards) >= MAX_BOARD_LIST_SIZE:
+            break
         board, _ = ProjectBoard.objects.get_or_create(
             application=application, defaults={'title': application.idea.title}
         )
         boards.append(board)
 
+    boards = _board_detail_queryset().filter(pk__in=[board.pk for board in boards])
     return Response(ProjectBoardSerializer(boards, many=True).data)
 
 
@@ -194,7 +225,8 @@ def task_comments(request, board_id, task_id):
         return Response({'error': 'Task not found.'}, status=404)
 
     if request.method == 'GET':
-        return Response(TaskCommentSerializer(task.comments.all(), many=True).data)
+        comments = task.comments.select_related('author')[:MAX_COMMENT_LIST_SIZE]
+        return Response(TaskCommentSerializer(comments, many=True).data)
 
     serializer = TaskCommentSerializer(data=request.data)
     if not serializer.is_valid():
@@ -243,9 +275,11 @@ def upload_attachment(request, board_id, task_id):
     if not file:
         return Response({'error': 'No file provided.'}, status=400)
 
-    # 10 MB limit
-    if file.size > 10 * 1024 * 1024:
+    if file.size > MAX_ATTACHMENT_SIZE:
         return Response({'error': 'File too large. Max 10 MB.'}, status=400)
+    extension = os.path.splitext(file.name or '')[1].lower()
+    if extension not in ALLOWED_ATTACHMENT_EXTENSIONS:
+        return Response({'error': 'Unsupported file type.'}, status=400)
 
     attachment = TaskAttachment.objects.create(
         task=task,
@@ -278,7 +312,7 @@ def delete_attachment(request, board_id, task_id, attachment_id):
     if attachment.uploaded_by_id != request.user.id and request.user.role != 'doctor':
         return Response({'error': 'Not allowed.'}, status=403)
 
-    _log(board, request.user, 'attachment_removed', attachment.filename, task=task_id)
+    _log(board, request.user, 'attachment_removed', attachment.filename, task=attachment.task)
     attachment.file.delete(save=False)
     attachment.delete()
     return Response(status=204)
@@ -324,18 +358,21 @@ def hod_boards(request):
         proposals = StudentIdeaProposal.objects.filter(status='assigned').select_related('supervisor')
         applications = IdeaApplication.objects.filter(status='registered').select_related('idea__doctor')
 
-    for proposal in proposals:
+    for proposal in proposals[:MAX_BOARD_LIST_SIZE]:
         board, _ = ProjectBoard.objects.get_or_create(
             proposal=proposal, defaults={'title': proposal.title}
         )
         boards.append(board)
 
-    for application in applications:
+    for application in applications[:MAX_BOARD_LIST_SIZE]:
+        if len(boards) >= MAX_BOARD_LIST_SIZE:
+            break
         board, _ = ProjectBoard.objects.get_or_create(
             application=application, defaults={'title': application.idea.title}
         )
         boards.append(board)
 
+    boards = _board_detail_queryset().filter(pk__in=[board.pk for board in boards])
     return Response(ProjectBoardSerializer(boards, many=True).data)
 
 
@@ -363,38 +400,26 @@ def hod_stats(request):
 
     total_projects = proposals_count + applications_count
 
-    # Calculate average progress
     if request.user.role == 'hod':
-        proposals = StudentIdeaProposal.objects.filter(department=department, status='assigned')
-        applications = IdeaApplication.objects.filter(idea__department=department, status='registered')
+        boards_qs = ProjectBoard.objects.filter(
+            Q(proposal__department=department, proposal__status='assigned') |
+            Q(application__idea__department=department, application__status='registered')
+        )
     else:
-        proposals = StudentIdeaProposal.objects.filter(status='assigned')
-        applications = IdeaApplication.objects.filter(status='registered')
+        boards_qs = ProjectBoard.objects.filter(
+            Q(proposal__status='assigned') | Q(application__status='registered')
+        )
 
     total_progress = 0
     board_count = 0
 
-    for proposal in proposals:
-        try:
-            board = ProjectBoard.objects.get(proposal=proposal)
-            tasks = board.tasks.all()
-            if tasks.count() > 0:
-                done = tasks.filter(status='done').count()
-                total_progress += (done / tasks.count()) * 100
-                board_count += 1
-        except ProjectBoard.DoesNotExist:
-            pass
-
-    for application in applications:
-        try:
-            board = ProjectBoard.objects.get(application=application)
-            tasks = board.tasks.all()
-            if tasks.count() > 0:
-                done = tasks.filter(status='done').count()
-                total_progress += (done / tasks.count()) * 100
-                board_count += 1
-        except ProjectBoard.DoesNotExist:
-            pass
+    for board in boards_qs.annotate(
+        total_tasks=Count('tasks'),
+        done_tasks=Count('tasks', filter=Q(tasks__status='done')),
+    ):
+        if board.total_tasks:
+            total_progress += (board.done_tasks / board.total_tasks) * 100
+            board_count += 1
 
     avg_progress = round(total_progress / board_count) if board_count > 0 else 0
 

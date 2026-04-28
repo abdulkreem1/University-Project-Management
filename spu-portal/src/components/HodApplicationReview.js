@@ -14,27 +14,37 @@ export default function HodApplicationReview({ onBack }) {
   const [reviewing, setReviewing] = useState(null);
   const [reason, setReason]       = useState('');
   const [actionError, setActionError] = useState('');
+  const [confirming, setConfirming]   = useState(false);
   const [formResponses, setFormResponses] = useState({});
   const [expandedForm, setExpandedForm]   = useState(null);
 
   useEffect(() => {
+    let active = true;
     fetchHodPendingApplications()
-      .then((res) => {
+      .then(async (res) => {
+        if (!active) return;
         setApps(res.data);
-        res.data.forEach((app) => {
-          fetchResponseByApplication(app.id)
-            .then((r) => setFormResponses((prev) => ({ ...prev, [app.id]: r.data })))
-            .catch(() => {});
+        const responses = await Promise.allSettled(
+          res.data.map((app) => fetchResponseByApplication(app.id).then((r) => [app.id, r.data]))
+        );
+        if (!active) return;
+        const next = {};
+        responses.forEach((result) => {
+          if (result.status === 'fulfilled') next[result.value[0]] = result.value[1];
         });
+        setFormResponses(next);
       })
-      .catch(() => setError('Failed to load applications.'))
-      .finally(() => setLoading(false));
+      .catch(() => { if (active) setError('Failed to load applications.'); })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
   }, []);
 
   const openReview = (id, action) => { setReviewing({ id, action }); setReason(''); setActionError(''); };
 
   const handleConfirm = async () => {
+    if (!reviewing || confirming) return;
     setActionError('');
+    setConfirming(true);
     try {
       await hodReviewApplication(reviewing.id, { action: reviewing.action, rejection_reason: reason });
       setApps((prev) => prev.filter((a) => a.id !== reviewing.id));
@@ -42,6 +52,8 @@ export default function HodApplicationReview({ onBack }) {
     } catch (err) {
       const data = err.response?.data;
       setActionError(data?.rejection_reason?.[0] || data?.error || 'Something went wrong.');
+    } finally {
+      setConfirming(false);
     }
   };
 
@@ -142,8 +154,10 @@ export default function HodApplicationReview({ onBack }) {
             )}
             {actionError && <div className="alert alert-error">{actionError}</div>}
             <div className="sv-modal-actions">
-              <button className={`btn ${reviewing.action === 'approve' ? 'btn-primary' : 'btn-danger'}`} onClick={handleConfirm}>Confirm</button>
-              <button className="btn btn-outline" onClick={() => setReviewing(null)}>Cancel</button>
+              <button className={`btn ${reviewing.action === 'approve' ? 'btn-primary' : 'btn-danger'}`} onClick={handleConfirm} disabled={confirming}>
+                {confirming ? 'Processing...' : 'Confirm'}
+              </button>
+              <button className="btn btn-outline" onClick={() => setReviewing(null)} disabled={confirming}>Cancel</button>
             </div>
           </div>
         </div>

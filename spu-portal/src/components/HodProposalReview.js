@@ -14,21 +14,29 @@ export default function HodProposalReview({ onBack }) {
   const [reviewing, setReviewing]     = useState(null);
   const [reason, setReason]           = useState('');
   const [actionError, setActionError] = useState('');
+  const [confirming, setConfirming]   = useState(false);
   const [formResponses, setFormResponses] = useState({});
   const [expandedForm, setExpandedForm]   = useState(null);
 
   useEffect(() => {
+    let active = true;
     fetchHodPending()
-      .then((res) => {
+      .then(async (res) => {
+        if (!active) return;
         setProposals(res.data);
-        res.data.forEach((p) => {
-          fetchResponseByProposal(p.id)
-            .then((r) => setFormResponses((prev) => ({ ...prev, [p.id]: r.data })))
-            .catch(() => {});
+        const responses = await Promise.allSettled(
+          res.data.map((p) => fetchResponseByProposal(p.id).then((r) => [p.id, r.data]))
+        );
+        if (!active) return;
+        const next = {};
+        responses.forEach((result) => {
+          if (result.status === 'fulfilled') next[result.value[0]] = result.value[1];
         });
+        setFormResponses(next);
       })
-      .catch(() => setError('Failed to load proposals.'))
-      .finally(() => setLoading(false));
+      .catch(() => { if (active) setError('Failed to load proposals.'); })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
   }, []);
 
   const openReview = (id, action) => {
@@ -38,7 +46,9 @@ export default function HodProposalReview({ onBack }) {
   };
 
   const handleConfirm = async () => {
+    if (!reviewing || confirming) return;
     setActionError('');
+    setConfirming(true);
     try {
       await hodReview(reviewing.id, {
         action: reviewing.action,
@@ -51,6 +61,8 @@ export default function HodProposalReview({ onBack }) {
       if (data?.rejection_reason) setActionError(data.rejection_reason[0]);
       else if (data?.error) setActionError(data.error);
       else setActionError('Something went wrong.');
+    } finally {
+      setConfirming(false);
     }
   };
 
@@ -173,10 +185,11 @@ export default function HodProposalReview({ onBack }) {
               <button
                 className={`btn ${reviewing.action === 'approve' ? 'btn-primary' : 'btn-danger'}`}
                 onClick={handleConfirm}
+                disabled={confirming}
               >
-                Confirm
+                {confirming ? 'Processing...' : 'Confirm'}
               </button>
-              <button className="btn btn-outline" onClick={() => setReviewing(null)}>Cancel</button>
+              <button className="btn btn-outline" onClick={() => setReviewing(null)} disabled={confirming}>Cancel</button>
             </div>
           </div>
         </div>

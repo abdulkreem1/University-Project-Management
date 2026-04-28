@@ -9,6 +9,7 @@ export default function HodIdeaReview({ onBack }) {
   const [reviewing, setReviewing] = useState(null); // { id, action }
   const [reason, setReason]       = useState('');
   const [actionError, setActionError] = useState('');
+  const [confirming, setConfirming]   = useState(false);
 
   useEffect(() => {
     fetchHodPendingDoctorIdeas()
@@ -24,7 +25,9 @@ export default function HodIdeaReview({ onBack }) {
   };
 
   const handleConfirm = async () => {
+    if (!reviewing || confirming) return;
     setActionError('');
+    setConfirming(true);
     try {
       await hodReviewDoctorIdea(reviewing.id, {
         action: reviewing.action,
@@ -37,6 +40,8 @@ export default function HodIdeaReview({ onBack }) {
       if (data?.rejection_reason) setActionError(data.rejection_reason[0]);
       else if (data?.error) setActionError(data.error);
       else setActionError('Something went wrong.');
+    } finally {
+      setConfirming(false);
     }
   };
 
@@ -120,10 +125,11 @@ export default function HodIdeaReview({ onBack }) {
               <button
                 className={`btn ${reviewing.action === 'approve' ? 'btn-primary' : 'btn-danger'}`}
                 onClick={handleConfirm}
+                disabled={confirming}
               >
-                Confirm
+                {confirming ? 'Processing...' : 'Confirm'}
               </button>
-              <button className="btn btn-outline" onClick={() => setReviewing(null)}>Cancel</button>
+              <button className="btn btn-outline" onClick={() => setReviewing(null)} disabled={confirming}>Cancel</button>
             </div>
           </div>
         </div>
