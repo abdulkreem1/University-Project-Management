@@ -107,6 +107,19 @@
   color: #64748b;
 }
 
+.sp-supervisors-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  font-size: 12px;
+}
+
+.sp-supervisor-label {
+  color: #334155;
+  font-weight: 700;
+}
+
 /* ── Column Stats ─────────────────────────────────────────────────────────── */
 .sp-col-stats {
   display: grid;

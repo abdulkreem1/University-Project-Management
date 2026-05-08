@@ -11,10 +11,15 @@ export default function MyProject() {
   const [activeTab, setActiveTab] = useState('board'); // 'board' | 'workflow'
 
   useEffect(() => {
+    let active = true;
     fetchMyBoard()
-      .then((res) => { if (res.data.has_project) setBoard(res.data.board); })
-      .catch(() => setError('Failed to load board.'))
-      .finally(() => setLoading(false));
+      .then((boardRes) => {
+        if (!active) return;
+        if (boardRes.data.has_project) setBoard(boardRes.data.board);
+      })
+      .catch(() => { if (active) setError('Failed to load board.'); })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
   }, []);
 
   if (loading) return <div style={{ padding: 48, textAlign: 'center', color: '#64748b' }}>Loading your project board…</div>;

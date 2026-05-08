@@ -2,7 +2,11 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from django.db import IntegrityError, transaction
+from django.http import FileResponse
 from datetime import datetime, timedelta
+import json
+import mimetypes
+import os
 
 from .models import WorkflowTemplate, WorkflowStage, ProjectWorkflow, WorkflowStageInstance
 from .serializers import (
@@ -10,6 +14,11 @@ from .serializers import (
     ProjectWorkflowSerializer, WorkflowStageInstanceSerializer
 )
 from .permissions import IsHodOrDoctor, IsHod, IsStudent
+from notifications.utils import notify, notify_many
+
+
+MAX_WORKFLOW_FILE_SIZE = 10 * 1024 * 1024
+ALLOWED_WORKFLOW_FILE_EXTENSIONS = {'.pdf', '.doc', '.docx', '.xls', '.xlsx', '.png', '.jpg', '.jpeg', '.gif', '.txt'}
 
 
 def _get_project_board(project_board_id):
@@ -20,37 +29,56 @@ def _get_project_board(project_board_id):
         'proposal__student',
         'application__idea__doctor',
         'application__student',
-    ).get(id=project_board_id)
+    ).prefetch_related('proposal__supervisor_assignments__supervisor').get(id=project_board_id)
 
 
 def _project_department_and_supervisor(project_board):
     if project_board.proposal:
-        return project_board.proposal.department, project_board.proposal.supervisor
+        supervisors = [
+            assignment.supervisor
+            for assignment in project_board.proposal.supervisor_assignments.all()
+            if assignment.status == 'accepted'
+        ]
+        if not supervisors and project_board.proposal.supervisor:
+            supervisors = [project_board.proposal.supervisor]
+        return project_board.proposal.department, supervisors
     if project_board.application and project_board.application.idea:
-        return project_board.application.idea.department, project_board.application.idea.doctor
-    return None, None
+        return project_board.application.idea.department, [project_board.application.idea.doctor]
+    return None, []
 
 
 def _user_can_access_project(user, project_board):
-    department, supervisor = _project_department_and_supervisor(project_board)
+    department, supervisors = _project_department_and_supervisor(project_board)
     if user.role == 'dean':
         return True
     if user.role == 'hod':
         return department == user.department
     if user.role == 'doctor':
-        return supervisor == user
+        return any(supervisor == user for supervisor in supervisors)
     if user.role == 'student':
         return project_board.members.filter(pk=user.pk).exists()
     return False
 
 
 def _user_can_apply_workflow(user, project_board):
-    department, supervisor = _project_department_and_supervisor(project_board)
+    department, supervisors = _project_department_and_supervisor(project_board)
     if user.role == 'hod':
         return department == user.department
     if user.role == 'doctor':
-        return supervisor == user
+        return any(supervisor == user for supervisor in supervisors)
     return False
+
+
+def _workflow_notification_metadata(project_board, *, workflow=None, stage_instance=None):
+    metadata = {'board_id': project_board.id, 'board_title': project_board.title}
+    if workflow:
+        metadata['workflow_id'] = workflow.id
+        metadata['workflow_name'] = workflow.template.name
+    if stage_instance:
+        metadata['stage_instance_id'] = stage_instance.id
+        metadata['stage_name'] = stage_instance.stage.name
+        metadata['due_date'] = stage_instance.due_date.isoformat() if stage_instance.due_date else None
+    return metadata
 
 
 # ── HoD/Doctor: Manage Workflow Templates ────────────────────────────────────
@@ -251,7 +279,19 @@ def apply_workflow_to_project(request):
                 due_date=due_date,
                 status='pending'
             )
-    
+
+    notify_many(
+        project_board.members,
+        'workflow_applied',
+        'Project Workflow Applied',
+        f'{request.user.get_full_name() or request.user.username} applied "{template.name}" to {project_board.title}.',
+        actor=request.user,
+        action_label='Open workflow',
+        entity_type='workflow',
+        entity_id=project_workflow.id,
+        metadata=_workflow_notification_metadata(project_board, workflow=project_workflow),
+    )
+     
     return Response(ProjectWorkflowSerializer(
         ProjectWorkflow.objects.prefetch_related('stage_instances').get(pk=project_workflow.pk)
     ).data, status=201)
@@ -316,37 +356,130 @@ def submit_workflow_stage(request, stage_instance_id):
         return Response({'error': 'Not allowed to submit this workflow stage'}, status=403)
     
     field_responses = request.data.get('field_responses', {})
+    if isinstance(field_responses, str):
+        try:
+            field_responses = json.loads(field_responses)
+        except json.JSONDecodeError:
+            return Response({'error': 'field_responses must be valid JSON'}, status=400)
     if not isinstance(field_responses, dict):
         return Response({'error': 'field_responses must be an object'}, status=400)
 
     fields_by_id = {str(field.id): field for field in stage_instance.stage.fields.all()}
+    existing_responses = list(stage_instance.field_responses.select_related('field'))
+    existing_by_field = {str(response.field_id): response for response in existing_responses}
+
     for field_id in field_responses.keys():
         if str(field_id) not in fields_by_id:
             return Response({'error': f'Invalid field for this stage: {field_id}'}, status=400)
     for field in fields_by_id.values():
-        if field.required and not field_responses.get(str(field.id)):
+        field_id = str(field.id)
+        upload = request.FILES.get(f'file_{field.id}') or request.FILES.get(field_id)
+        existing = existing_by_field.get(field_id)
+        if upload:
+            extension = os.path.splitext(upload.name or '')[1].lower()
+            if upload.size > MAX_WORKFLOW_FILE_SIZE:
+                return Response({'error': f'File too large for field: {field.label}. Max 10 MB.'}, status=400)
+            if extension not in ALLOWED_WORKFLOW_FILE_EXTENSIONS:
+                return Response({'error': f'Unsupported file type for field: {field.label}.'}, status=400)
+        if field.required and field.field_type == 'file' and not upload and not (existing and existing.file):
+            return Response({'error': f'Field is required: {field.label}'}, status=400)
+        if field.required and field.field_type != 'file' and not field_responses.get(field_id):
             return Response({'error': f'Field is required: {field.label}'}, status=400)
     
     with transaction.atomic():
         from .models import WorkflowFieldResponse
         stage_instance = WorkflowStageInstance.objects.select_for_update().get(pk=stage_instance.pk)
-        
-        # Delete existing responses for this stage instance
+
+        preserved_files = set()
         stage_instance.field_responses.all().delete()
         
-        # Create new responses
-        for field_id, value in field_responses.items():
-            WorkflowFieldResponse.objects.create(
-                stage_instance=stage_instance,
-                field_id=field_id,
-                value=value
-            )
+        for field_id, field in fields_by_id.items():
+            value = field_responses.get(field_id, '')
+            upload = request.FILES.get(f'file_{field_id}') or request.FILES.get(field_id)
+            existing = existing_by_field.get(field_id)
+            response_data = {
+                'stage_instance': stage_instance,
+                'field_id': field_id,
+                'value': str(value or ''),
+            }
+
+            if field.field_type == 'file':
+                if upload:
+                    response_data.update({
+                        'value': upload.name,
+                        'file': upload,
+                        'filename': upload.name,
+                        'file_size': upload.size,
+                    })
+                elif existing and existing.file:
+                    response_data.update({
+                        'value': existing.filename or existing.value,
+                        'file': existing.file.name,
+                        'filename': existing.filename,
+                        'file_size': existing.file_size,
+                    })
+                    preserved_files.add(existing.file.name)
+
+            WorkflowFieldResponse.objects.create(**response_data)
+
+        for response in existing_responses:
+            if response.file and response.file.name not in preserved_files:
+                response.file.delete(save=False)
         
         stage_instance.status = 'submitted'
         stage_instance.submitted_at = datetime.now()
         stage_instance.save()
-    
+
+    reviewer = stage_instance.project_workflow.template.created_by
+    notify(
+        reviewer,
+        'workflow_stage_submitted',
+        'Workflow Stage Submitted',
+        f'{request.user.get_full_name() or request.user.username} submitted "{stage_instance.stage.name}" for {project_board.title}.',
+        actor=request.user,
+        action_label='Review stage',
+        entity_type='workflow_stage',
+        entity_id=stage_instance.id,
+        metadata=_workflow_notification_metadata(project_board, stage_instance=stage_instance),
+    )
+     
     return Response(WorkflowStageInstanceSerializer(stage_instance).data)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def open_workflow_response_file(request, stage_instance_id, response_id):
+    """Open a workflow file response for authorized project users/reviewers."""
+    from project_management.models import ProjectBoard
+    from .models import WorkflowFieldResponse
+
+    try:
+        response = WorkflowFieldResponse.objects.select_related(
+            'field', 'stage_instance__project_workflow__template__created_by'
+        ).get(pk=response_id, stage_instance_id=stage_instance_id)
+    except WorkflowFieldResponse.DoesNotExist:
+        return Response({'error': 'File response not found'}, status=404)
+
+    try:
+        project_board = _get_project_board(response.stage_instance.project_workflow.project_board_id)
+    except ProjectBoard.DoesNotExist:
+        return Response({'error': 'Project not found'}, status=404)
+
+    template_creator = response.stage_instance.project_workflow.template.created_by
+    if not _user_can_access_project(request.user, project_board) and request.user != template_creator:
+        return Response({'error': 'Not allowed to open this workflow file'}, status=403)
+
+    if not response.file:
+        return Response({'error': 'No file was uploaded for this response'}, status=404)
+
+    filename = response.filename or os.path.basename(response.file.name)
+    content_type = mimetypes.guess_type(filename)[0] or 'application/octet-stream'
+    return FileResponse(
+        response.file.open('rb'),
+        as_attachment=False,
+        filename=filename,
+        content_type=content_type,
+    )
 
 
 # ── HoD/Doctor: Review Workflow Stage Submissions ─────────────────────────────
@@ -385,7 +518,22 @@ def review_workflow_stage(request, stage_instance_id):
         stage_instance.reviewed_by = request.user
         stage_instance.reviewed_at = datetime.now()
         stage_instance.save()
-    
+
+    project_board = _get_project_board(stage_instance.project_workflow.project_board_id)
+    notif_type = 'workflow_stage_approved' if action == 'approve' else 'workflow_stage_rejected'
+    title = 'Workflow Stage Approved' if action == 'approve' else 'Workflow Stage Rejected'
+    notify_many(
+        project_board.members,
+        notif_type,
+        title,
+        f'"{stage_instance.stage.name}" for {project_board.title} was {stage_instance.status}.',
+        actor=request.user,
+        action_label='Open workflow',
+        entity_type='workflow_stage',
+        entity_id=stage_instance.id,
+        metadata=_workflow_notification_metadata(project_board, stage_instance=stage_instance),
+    )
+     
     return Response(WorkflowStageInstanceSerializer(stage_instance).data)
 
 
@@ -402,6 +550,7 @@ def get_available_projects(request):
         'application__student'
     ).prefetch_related(
         'proposal__invitations',
+        'proposal__supervisor_assignments__supervisor',
         'application__invitations'
     )
 
@@ -417,7 +566,7 @@ def get_available_projects(request):
     # Filter based on user role
     filtered_projects = []
     for project in project_list:
-        department, supervisor = _project_department_and_supervisor(project)
+        department, supervisors = _project_department_and_supervisor(project)
         
         # Skip if no department found
         if not department:
@@ -430,7 +579,7 @@ def get_available_projects(request):
                 continue
         elif request.user.role == 'doctor':
             # Doctor can only see projects they supervise
-            if supervisor != request.user:
+            if not any(supervisor == request.user for supervisor in supervisors):
                 continue
         else:
             continue
@@ -454,7 +603,11 @@ def get_available_projects(request):
             'id': project.id,
             'title': project.title,
             'department': department,
-            'supervisor_name': supervisor.username if supervisor else None,  # Use username
+            'supervisor_name': ', '.join([supervisor.username for supervisor in supervisors]) if supervisors else None,
+            'supervisors': [
+                {'id': supervisor.id, 'username': supervisor.username, 'name': supervisor.get_full_name() or supervisor.username}
+                for supervisor in supervisors
+            ],
             'team_members': team_members,
             'has_workflow': has_workflow,
             'can_review': workflow_created_by_user  # New field
@@ -480,6 +633,8 @@ def get_reviewable_projects(request):
     ).select_related(
         'proposal__supervisor',
         'application__idea__doctor'
+    ).prefetch_related(
+        'proposal__supervisor_assignments__supervisor'
     )
     
     # Serialize
@@ -495,15 +650,28 @@ def get_reviewable_projects(request):
         
         # Get supervisor
         supervisor_name = None
+        supervisors = []
         if project.proposal:
-            supervisor_name = project.proposal.supervisor.username if project.proposal.supervisor else None
+            supervisors = [
+                assignment.supervisor
+                for assignment in project.proposal.supervisor_assignments.all()
+                if assignment.status == 'accepted'
+            ]
+            if not supervisors and project.proposal.supervisor:
+                supervisors = [project.proposal.supervisor]
+            supervisor_name = ', '.join([supervisor.username for supervisor in supervisors]) if supervisors else None
         elif project.application:
+            supervisors = [project.application.idea.doctor] if project.application.idea.doctor else []
             supervisor_name = project.application.idea.doctor.username if project.application.idea.doctor else None
         
         data.append({
             'id': project.id,
             'title': project.title,
             'supervisor_name': supervisor_name,
+            'supervisors': [
+                {'id': supervisor.id, 'username': supervisor.username, 'name': supervisor.get_full_name() or supervisor.username}
+                for supervisor in supervisors
+            ],
             'team_members': team_members,
             'has_workflow': True
         })

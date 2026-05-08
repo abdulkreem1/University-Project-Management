@@ -45,15 +45,22 @@ class ProjectBoard(models.Model):
     @property
     def members(self):
         from django.contrib.auth import get_user_model
-        from projects.models import ProposalInvitation, TeamInvitation
+        from projects.models import ProjectWithdrawalRequest, ProposalInvitation, TeamInvitation
         User = get_user_model()
         ids = set()
+        withdrawn_ids = set()
         if self.proposal:
             ids.add(self.proposal.student_id)
             ids.update(
                 ProposalInvitation.objects.filter(
                     proposal=self.proposal, status='accepted'
                 ).values_list('invitee_id', flat=True)
+            )
+            withdrawn_ids.update(
+                ProjectWithdrawalRequest.objects.filter(
+                    proposal=self.proposal,
+                    status='approved',
+                ).values_list('student_id', flat=True)
             )
         elif self.application:
             ids.add(self.application.student_id)
@@ -62,7 +69,13 @@ class ProjectBoard(models.Model):
                     application=self.application, status='accepted'
                 ).values_list('invitee_id', flat=True)
             )
-        return User.objects.filter(id__in=ids)
+            withdrawn_ids.update(
+                ProjectWithdrawalRequest.objects.filter(
+                    application=self.application,
+                    status='approved',
+                ).values_list('student_id', flat=True)
+            )
+        return User.objects.filter(id__in=ids - withdrawn_ids)
 
 
 class Task(models.Model):

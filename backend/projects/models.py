@@ -70,7 +70,8 @@ class StudentIdeaProposal(models.Model):
     description      = models.TextField()
     department       = models.CharField(max_length=50, choices=DEPARTMENTS)
     team_size        = models.PositiveSmallIntegerField(default=1)
-    team_size_reason = models.TextField(blank=True, help_text='Required when team_size < 2 or > 3')
+    team_size_reason = models.TextField(blank=True, help_text='Required when team_size is 1 or 4')
+    supervisor_count = models.PositiveSmallIntegerField(default=1)
     status           = models.CharField(max_length=25, choices=STUDENT_IDEA_STATUS, default='pending_supervisor')
     rejection_reason = models.TextField(blank=True)
     created_at       = models.DateTimeField(auto_now_add=True)
@@ -85,6 +86,42 @@ class StudentIdeaProposal(models.Model):
 
     def __str__(self):
         return f"[Student] {self.title} ({self.student.username})"
+
+
+SUPERVISOR_ASSIGNMENT_STATUS = [
+    ('pending', 'Pending'),
+    ('accepted', 'Accepted'),
+    ('rejected', 'Rejected'),
+]
+
+
+class ProposalSupervisor(models.Model):
+    """Doctor invited to supervise a student proposal; each doctor responds independently."""
+    proposal = models.ForeignKey(
+        StudentIdeaProposal,
+        on_delete=models.CASCADE,
+        related_name='supervisor_assignments',
+    )
+    supervisor = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='proposal_supervisor_assignments',
+        limit_choices_to={'role': 'doctor'},
+    )
+    status = models.CharField(max_length=10, choices=SUPERVISOR_ASSIGNMENT_STATUS, default='pending')
+    rejection_reason = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ('proposal', 'supervisor')
+        indexes = [
+            models.Index(fields=['supervisor', 'status']),
+            models.Index(fields=['proposal', 'status']),
+        ]
+
+    def __str__(self):
+        return f"Supervisor: {self.supervisor.username} -> {self.proposal.title} [{self.status}]"
 
 
 class ProposalInvitation(models.Model):
@@ -225,3 +262,78 @@ class TeamInvitation(models.Model):
 
     def __str__(self):
         return f"Invite: {self.invitee.username} → {self.application.idea.title} [{self.status}]"
+
+
+WITHDRAWAL_STATUS = [
+    ('pending', 'Pending'),
+    ('approved', 'Approved'),
+    ('rejected', 'Rejected'),
+]
+
+
+class ProjectWithdrawalRequest(models.Model):
+    """HoD-approved request allowing a student to leave a registered/assigned project."""
+    student = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='project_withdrawal_requests',
+        limit_choices_to={'role': 'student'},
+    )
+    proposal = models.ForeignKey(
+        StudentIdeaProposal,
+        on_delete=models.CASCADE,
+        related_name='withdrawal_requests',
+        null=True,
+        blank=True,
+    )
+    application = models.ForeignKey(
+        IdeaApplication,
+        on_delete=models.CASCADE,
+        related_name='withdrawal_requests',
+        null=True,
+        blank=True,
+    )
+    reason = models.TextField()
+    status = models.CharField(max_length=10, choices=WITHDRAWAL_STATUS, default='pending')
+    rejection_reason = models.TextField(blank=True)
+    reviewed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        related_name='reviewed_project_withdrawals',
+        null=True,
+        blank=True,
+        limit_choices_to={'role': 'hod'},
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['student', 'status', '-created_at']),
+            models.Index(fields=['status', '-created_at']),
+            models.Index(fields=['proposal', 'status']),
+            models.Index(fields=['application', 'status']),
+        ]
+        constraints = [
+            models.CheckConstraint(
+                condition=(
+                    Q(proposal__isnull=False, application__isnull=True) |
+                    Q(proposal__isnull=True, application__isnull=False)
+                ),
+                name='withdrawal_links_exactly_one_project',
+            ),
+            models.UniqueConstraint(
+                fields=['student', 'proposal'],
+                condition=Q(status='pending', proposal__isnull=False),
+                name='unique_pending_withdrawal_per_proposal_member',
+            ),
+            models.UniqueConstraint(
+                fields=['student', 'application'],
+                condition=Q(status='pending', application__isnull=False),
+                name='unique_pending_withdrawal_per_application_member',
+            ),
+        ]
+
+    def __str__(self):
+        target = self.proposal or self.application
+        return f"Withdrawal: {self.student.username} → {target} [{self.status}]"

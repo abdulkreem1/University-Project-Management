@@ -1,0 +1,286 @@
+.pw-wrap {
+  padding: 28px;
+  min-height: 100%;
+  background: #f8f9fd;
+}
+
+.pw-loading {
+  padding: 48px;
+  text-align: center;
+  color: #64748b;
+}
+
+.pw-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 22px;
+}
+
+.pw-back {
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  padding: 9px 14px;
+  background: #fff;
+  color: #475569;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.pw-back:hover {
+  border-color: #2563eb;
+  color: #2563eb;
+}
+
+.pw-header h2 {
+  margin: 0 0 6px;
+  color: #111827;
+  font-size: 26px;
+}
+
+.pw-header p {
+  margin: 0;
+  color: #64748b;
+  font-size: 14px;
+}
+
+.pw-alert {
+  margin-bottom: 16px;
+  border-radius: 10px;
+  padding: 12px 14px;
+  font-size: 14px;
+}
+
+.pw-alert-error {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.pw-alert-success {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.pw-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
+  gap: 18px;
+  margin-bottom: 18px;
+}
+
+.pw-card {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  padding: 22px;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.06);
+  margin-bottom: 18px;
+}
+
+.pw-card-primary {
+  border-color: #bfdbfe;
+  background: linear-gradient(135deg, #eff6ff 0%, #ffffff 70%);
+}
+
+.pw-eyebrow {
+  display: inline-block;
+  margin-bottom: 8px;
+  color: #2563eb;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.pw-card h3 {
+  margin: 0 0 8px;
+  color: #111827;
+  font-size: 20px;
+}
+
+.pw-card p {
+  color: #64748b;
+  line-height: 1.6;
+}
+
+.pw-status-note {
+  margin-top: 14px;
+  border-radius: 10px;
+  padding: 12px;
+  background: #fef3c7;
+  color: #92400e;
+  font-size: 13px;
+}
+
+.pw-steps {
+  margin: 0;
+  padding-left: 20px;
+  color: #475569;
+  line-height: 1.8;
+  font-size: 14px;
+}
+
+.pw-section-title {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.pw-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.pw-form label {
+  color: #334155;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.pw-form textarea {
+  width: 100%;
+  border: 1.5px solid #cbd5e1;
+  border-radius: 12px;
+  padding: 12px 14px;
+  color: #111827;
+  font-size: 14px;
+  resize: vertical;
+  box-sizing: border-box;
+}
+
+.pw-form textarea:focus {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.14);
+}
+
+.pw-form textarea:disabled {
+  background: #f8fafc;
+  color: #94a3b8;
+}
+
+.pw-help {
+  margin: 0;
+  color: #92400e;
+  font-size: 13px;
+}
+
+.pw-submit {
+  align-self: flex-start;
+  border: none;
+  border-radius: 10px;
+  padding: 11px 18px;
+  background: #2563eb;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.pw-submit:hover:not(:disabled) { background: #1d4ed8; }
+.pw-submit:disabled { opacity: 0.55; cursor: not-allowed; }
+
+.pw-badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 5px 10px;
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.pw-badge-pending {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.pw-badge-approved {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.pw-badge-rejected {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.pw-empty {
+  margin: 0;
+  color: #64748b;
+}
+
+.pw-history {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.pw-history-item {
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 16px;
+  background: #f8fafc;
+}
+
+.pw-history-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.pw-history-top h4 {
+  margin: 0 0 4px;
+  color: #111827;
+  font-size: 16px;
+}
+
+.pw-history-top p,
+.pw-reviewed,
+.pw-review-note,
+.pw-reason {
+  margin: 0;
+  font-size: 13px;
+}
+
+.pw-reason {
+  color: #334155;
+}
+
+.pw-review-note {
+  margin-top: 8px;
+  color: #991b1b;
+}
+
+.pw-reviewed {
+  margin-top: 8px;
+  color: #64748b;
+}
+
+@media (max-width: 860px) {
+  .pw-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .pw-wrap {
+    padding: 18px;
+  }
+
+  .pw-header,
+  .pw-section-title,
+  .pw-history-top {
+    flex-direction: column;
+  }
+
+  .pw-submit {
+    width: 100%;
+  }
+}

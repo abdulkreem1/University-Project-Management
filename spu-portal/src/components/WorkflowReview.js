@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import {
-  fetchReviewableProjects, fetchProjectWorkflow, reviewWorkflowStage
+  fetchReviewableProjects, fetchProjectWorkflow, reviewWorkflowStage, openWorkflowResponseFile
 } from '../api';
 import './WorkflowReview.css';
 
@@ -86,6 +86,23 @@ export default function WorkflowReview({ onBack }) {
     }
   };
 
+  const handleOpenWorkflowFile = async (stageInstanceId, response) => {
+    const popup = window.open('', '_blank');
+    try {
+      const res = await openWorkflowResponseFile(stageInstanceId, response.id);
+      const blobUrl = URL.createObjectURL(new Blob([res.data], { type: res.headers['content-type'] }));
+      if (popup) {
+        popup.location.href = blobUrl;
+      } else {
+        window.location.href = blobUrl;
+      }
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
+    } catch {
+      if (popup) popup.close();
+      setError('Could not open this workflow file. Please try again.');
+    }
+  };
+
   if (loading && !workflow) {
     return <div className="wr-loading">Loading...</div>;
   }
@@ -136,7 +153,13 @@ export default function WorkflowReview({ onBack }) {
               {selectedStage.field_responses.map((response, idx) => (
                 <div key={idx} className="wr-response-item">
                   <span className="wr-response-label">{response.field_label}:</span>
-                  <span className="wr-response-value">{response.value || '—'}</span>
+                  {response.has_file ? (
+                    <button type="button" className="wr-file-link" onClick={() => handleOpenWorkflowFile(selectedStage.id, response)}>
+                      {response.filename || response.value || 'Open file'}
+                    </button>
+                  ) : (
+                    <span className="wr-response-value">{response.value || '—'}</span>
+                  )}
                 </div>
               ))}
             </div>

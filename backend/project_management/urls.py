@@ -3,7 +3,7 @@ from .views import (
     my_board, supervisor_boards,
     create_task, update_task, delete_task,
     task_comments, delete_comment,
-    upload_attachment, delete_attachment,
+    upload_attachment, open_attachment, delete_attachment,
     board_activity,
     hod_boards, hod_stats,
 )
@@ -36,6 +36,8 @@ urlpatterns = [
     # Attachments
     path('api/project-management/board/<int:board_id>/tasks/<int:task_id>/attachments/',
          upload_attachment, name='upload_attachment'),
+    path('api/project-management/board/<int:board_id>/tasks/<int:task_id>/attachments/<int:attachment_id>/open/',
+         open_attachment, name='open_attachment'),
     path('api/project-management/board/<int:board_id>/tasks/<int:task_id>/attachments/<int:attachment_id>/delete/',
          delete_attachment, name='delete_attachment'),
 

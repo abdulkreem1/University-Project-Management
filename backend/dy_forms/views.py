@@ -2,6 +2,7 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from django.db import transaction
+from django.db.models import Q
 
 from .models import DynamicForm, FormField, FormResponse
 from .serializers import DynamicFormSerializer, FormResponseSerializer
@@ -29,7 +30,8 @@ def _can_access_response(user, response):
         try:
             from projects.models import StudentIdeaProposal, IdeaApplication
             if response.proposal_id and StudentIdeaProposal.objects.filter(
-                pk=response.proposal_id, supervisor=user
+                Q(pk=response.proposal_id, supervisor=user) |
+                Q(pk=response.proposal_id, supervisor_assignments__supervisor=user)
             ).exists():
                 return True
             if response.application_id and IdeaApplication.objects.filter(

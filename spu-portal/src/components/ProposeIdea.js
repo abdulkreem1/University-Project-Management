@@ -32,8 +32,8 @@ const STATUS_META = {
   rejected:           { label: 'Rejected',                     icon: Icons.XCircle, cls: 'badge--rejected' },
 };
 
-const EMPTY = { title: '', description: '', department: '', supervisor: '',
-                team_size: 2, member_ids: [''] };
+const EMPTY = { title: '', description: '', department: '', supervisor: '', supervisor_count: 1, supervisor_ids: [''],
+                team_size: 2, team_size_reason: '', member_ids: [''] };
 
 const emptyValueForField = (field) => field.field_type === 'checkbox' ? [] : '';
 
@@ -48,6 +48,8 @@ export default function ProposeIdea({ onBack }) {
   // Dynamic form state
   const [dynForm, setDynForm]       = useState(null);
   const [dynValues, setDynValues]   = useState({});
+  const activeExisting = existing && existing.status !== 'rejected' ? existing : null;
+  const rejectedExisting = existing && existing.status === 'rejected' ? existing : null;
 
   useEffect(() => {
     setLoading(true);
@@ -96,6 +98,24 @@ export default function ProposeIdea({ onBack }) {
     });
   };
 
+  const handleSupervisorCountChange = (count) => {
+    const nextCount = Number(count);
+    setForm((prev) => ({
+      ...prev,
+      supervisor_count: nextCount,
+      supervisor_ids: Array(nextCount).fill('').map((_, idx) => prev.supervisor_ids[idx] || ''),
+      supervisor: prev.supervisor_ids[0] || prev.supervisor,
+    }));
+  };
+
+  const handleSupervisorChange = (idx, value) => {
+    setForm((prev) => {
+      const ids = [...prev.supervisor_ids];
+      ids[idx] = value;
+      return { ...prev, supervisor_ids: ids, supervisor: ids[0] || '' };
+    });
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
@@ -105,8 +125,11 @@ export default function ProposeIdea({ onBack }) {
         title:            form.title,
         description:      form.description,
         department:       form.department,
-        supervisor:       Number(form.supervisor),
+        supervisor:       form.supervisor_ids[0] ? Number(form.supervisor_ids[0]) : null,
+        supervisor_count:  Number(form.supervisor_count),
+        supervisor_ids:    form.supervisor_ids.filter(Boolean).map(Number),
         team_size:        Number(form.team_size),
+        team_size_reason: form.team_size_reason.trim(),
         member_ids:       form.member_ids.filter(Boolean),
         // dynamic form fields sent together in the same request
         form_id:          dynForm?.id || null,
@@ -133,9 +156,9 @@ export default function ProposeIdea({ onBack }) {
             {Icons.ArrowLeft} <span>Back to Overview</span>
           </button>
           <h1 className="pd-title">Project Proposal</h1>
-          <p className="pd-subtitle">{existing ? 'Track your submitted proposal' : 'Submit a new idea for approval'}</p>
+          <p className="pd-subtitle">{activeExisting ? 'Track your submitted proposal' : 'Submit a new idea for approval'}</p>
        </div>
-    </header>
+     </header>
   );
 
   // ── Loading ──
@@ -149,43 +172,50 @@ export default function ProposeIdea({ onBack }) {
   }
 
   // ── Already has a proposal ──
-  if (existing) {
-    const meta = STATUS_META[existing.status] || STATUS_META.pending_supervisor;
+  if (activeExisting) {
+    const meta = STATUS_META[activeExisting.status] || STATUS_META.pending_supervisor;
     return (
       <div className="premium-dashboard">
         <FormHeader />
 
         <div className="propose-status-card">
           <div className="propose-status-top">
-            <h3>{existing.title}</h3>
+            <h3>{activeExisting.title}</h3>
             <span className={`status-badge modern ${meta.cls}`}>{meta.icon} <span>{meta.label}</span></span>
           </div>
-          <p className="propose-status-desc">{existing.description}</p>
+          <p className="propose-status-desc">{activeExisting.description}</p>
 
           <div className="propose-status-meta">
             <div className="propose-meta-item">
               <span className="propose-meta-label">Department</span>
-              <span className="propose-meta-value">{existing.department.replace(/_/g, ' ')}</span>
+              <span className="propose-meta-value">{activeExisting.department.replace(/_/g, ' ')}</span>
             </div>
             <div className="propose-meta-item">
-              <span className="propose-meta-label">Supervisor</span>
-              <span className="propose-meta-value">{existing.supervisor_name || '—'}</span>
+              <span className="propose-meta-label">Supervisor{(activeExisting.supervisors || []).length > 1 ? 's' : ''}</span>
+              <span className="propose-meta-value">{activeExisting.supervisor_name || '—'}</span>
             </div>
             <div className="propose-meta-item">
               <span className="propose-meta-label">Team Size</span>
-              <span className="propose-meta-value">{existing.team_size} student{existing.team_size > 1 ? 's' : ''}</span>
+              <span className="propose-meta-value">{activeExisting.team_size} student{activeExisting.team_size > 1 ? 's' : ''}</span>
             </div>
             <div className="propose-meta-item">
               <span className="propose-meta-label">Submitted</span>
-              <span className="propose-meta-value">{new Date(existing.created_at).toLocaleDateString()}</span>
+              <span className="propose-meta-value">{new Date(activeExisting.created_at).toLocaleDateString()}</span>
             </div>
           </div>
 
+          {(activeExisting.team_size === 1 || activeExisting.team_size === 4) && activeExisting.team_size_reason && (
+            <div className="alert-strip alert-info-strip compact">
+              <span className="alert-icon">{Icons.Info}</span>
+              <span><strong>Team-size justification:</strong> {activeExisting.team_size_reason}</span>
+            </div>
+          )}
+
           {/* Team members */}
-          {existing.invitations && existing.invitations.length > 0 && (
+          {activeExisting.invitations && activeExisting.invitations.length > 0 && (
             <div className="propose-members">
               <span className="propose-meta-label">Team Members</span>
-              {existing.invitations.map((inv) => (
+              {activeExisting.invitations.map((inv) => (
                 <div key={inv.id} className="propose-member-row">
                   <span>{inv.invitee_name} ({inv.invitee_id})</span>
                   <span className={`status-badge modern ${inv.status === 'accepted' ? 'badge--approved' : inv.status === 'rejected' ? 'badge--rejected' : 'badge--pending'}`}>
@@ -197,35 +227,44 @@ export default function ProposeIdea({ onBack }) {
             </div>
           )}
 
+          {activeExisting.supervisors && activeExisting.supervisors.length > 0 && (
+            <div className="propose-members">
+              <span className="propose-meta-label">Supervisor Decisions</span>
+              {activeExisting.supervisors.map((sup) => (
+                <div key={sup.supervisor} className="propose-member-row">
+                  <span>{sup.name}</span>
+                  <span className={`status-badge modern ${sup.status === 'accepted' ? 'badge--approved' : sup.status === 'rejected' ? 'badge--rejected' : 'badge--pending'}`}>
+                    {sup.status === 'accepted' ? Icons.CheckCircle : sup.status === 'rejected' ? Icons.XCircle : Icons.Clock}
+                    <span>{sup.status.charAt(0).toUpperCase() + sup.status.slice(1)}</span>
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+
           {/* Alert Strips */}
-          {existing.status === 'awaiting_members' && (
+          {activeExisting.status === 'awaiting_members' && (
             <div className="alert-strip alert-info-strip">
               <span className="alert-icon">{Icons.Info}</span>
               <span>Waiting for team members to confirm their participation.</span>
             </div>
           )}
-          {existing.status === 'assigned' && (
+          {activeExisting.status === 'assigned' && (
             <div className="alert-strip alert-success-strip">
               <span className="alert-icon">{Icons.CheckCircle}</span>
               <span>Your idea has been approved and assigned to you.</span>
             </div>
           )}
-          {existing.status === 'rejected' && existing.rejection_reason && (
-            <div className="alert-strip alert-error-strip">
-              <span className="alert-icon">{Icons.XCircle}</span>
-              <span><strong>Rejection reason:</strong> {existing.rejection_reason}</span>
-            </div>
-          )}
-          {existing.status === 'pending_supervisor' && (
+          {activeExisting.status === 'pending_supervisor' && (
             <div className="alert-strip alert-info-strip">
               <span className="alert-icon">{Icons.Info}</span>
-              <span>Waiting for <strong>{existing.supervisor_name}</strong> to review.</span>
+              <span>Waiting for the requested supervisor{(activeExisting.supervisors || []).length > 1 ? 's' : ''} to review.</span>
             </div>
           )}
-          {existing.status === 'pending_hod' && (
+          {activeExisting.status === 'pending_hod' && (
             <div className="alert-strip alert-info-strip">
               <span className="alert-icon">{Icons.Info}</span>
-              <span>Approved by supervisor — awaiting HoD review.</span>
+              <span>Approved by the accepting supervisor{(activeExisting.supervisors || []).filter((sup) => sup.status === 'accepted').length > 1 ? 's' : ''} - awaiting HoD review.</span>
             </div>
           )}
         </div>
@@ -240,8 +279,19 @@ export default function ProposeIdea({ onBack }) {
 
       <div className="alert-strip alert-info-strip compact">
         <span className="alert-icon">{Icons.Info}</span>
-        <span>Team size for student proposals is <strong>2–3 students</strong>.</span>
+        <span>Standard teams are <strong>2–3 students</strong>. Solo and 4-person teams require justification and HoD approval.</span>
       </div>
+
+      {rejectedExisting && (
+        <div className="alert-strip alert-error-strip compact">
+          <span className="alert-icon">{Icons.XCircle}</span>
+          <span>
+            Your previous proposal <strong>{rejectedExisting.title}</strong> was rejected
+            {rejectedExisting.rejection_reason ? <>: {rejectedExisting.rejection_reason}</> : '.'}
+            {' '}You may submit a new idea below.
+          </span>
+        </div>
+      )}
 
       <div className="propose-card">
         {error && (
@@ -281,20 +331,34 @@ export default function ProposeIdea({ onBack }) {
             </div>
 
             <div className="form-group">
-              <label htmlFor="p-sup">Preferred Supervisor</label>
+              <label htmlFor="p-supervisor-count">Number of Supervisors</label>
               <div className="select-wrapper">
-                <select id="p-sup" name="supervisor" className="form-control"
-                  value={form.supervisor} onChange={handleChange} required>
+                <select id="p-supervisor-count" name="supervisor_count" className="form-control"
+                  value={form.supervisor_count} onChange={(e) => handleSupervisorCountChange(e.target.value)} required>
+                  {[1, 2, 3].map((n) => (
+                    <option key={n} value={n}>{n} supervisor{n > 1 ? 's' : ''}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </div>
+
+          {form.supervisor_ids.map((value, idx) => (
+            <div className="form-group" key={`supervisor-${idx}`}>
+              <label htmlFor={`p-sup-${idx}`}>Supervisor {idx + 1}</label>
+              <div className="select-wrapper">
+                <select id={`p-sup-${idx}`} className="form-control"
+                  value={value} onChange={(e) => handleSupervisorChange(idx, e.target.value)} required>
                   <option value="">— Select Supervisor —</option>
                   {doctors.map((d) => (
-                    <option key={d.id} value={d.id}>
+                    <option key={d.id} value={d.id} disabled={form.supervisor_ids.includes(String(d.id)) && value !== String(d.id)}>
                       {d.name}{d.department ? ` (${d.department.replace(/_/g, ' ')})` : ''}
                     </option>
                   ))}
                 </select>
               </div>
             </div>
-          </div>
+          ))}
 
           {/* Team size */}
           <div className="form-row">
@@ -304,7 +368,7 @@ export default function ProposeIdea({ onBack }) {
                 <select id="p-team" className="form-control"
                   value={form.team_size}
                   onChange={(e) => handleTeamSizeChange(e.target.value)}>
-                  {[2, 3].map((n) => (
+                  {[1, 2, 3, 4].map((n) => (
                     <option key={n} value={n}>{n} student{n > 1 ? 's' : ''}</option>
                   ))}
                 </select>
@@ -312,7 +376,25 @@ export default function ProposeIdea({ onBack }) {
             </div>
           </div>
 
-          {/* Member fields for standard sizes */}
+          {(Number(form.team_size) === 1 || Number(form.team_size) === 4) && (
+            <div className="form-group">
+              <label htmlFor="p-team-reason">Justification <span aria-hidden="true">*</span></label>
+              <textarea
+                id="p-team-reason"
+                name="team_size_reason"
+                rows={3}
+                className="form-control"
+                value={form.team_size_reason}
+                onChange={handleChange}
+                placeholder={Number(form.team_size) === 1
+                  ? 'Explain why this project can be completed by one student.'
+                  : 'Explain why this project requires four students.'}
+                required
+              />
+            </div>
+          )}
+
+          {/* Member fields */}
           {form.member_ids.map((val, idx) => (
             <div className="form-group" key={idx}>
               <label htmlFor={`p-member-${idx}`}>Team Member {idx + 2}</label>

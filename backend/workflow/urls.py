@@ -20,6 +20,7 @@ urlpatterns = [
     path('project/<int:project_board_id>/', views.get_project_workflow, name='get_project_workflow'),
     path('pending/', views.get_pending_stages, name='get_pending_stages'),
     path('stage/<int:stage_instance_id>/submit/', views.submit_workflow_stage, name='submit_workflow_stage'),
+    path('stage/<int:stage_instance_id>/responses/<int:response_id>/open/', views.open_workflow_response_file, name='open_workflow_response_file'),
     
     # Review Submissions
     path('stage/<int:stage_instance_id>/review/', views.review_workflow_stage, name='review_workflow_stage'),

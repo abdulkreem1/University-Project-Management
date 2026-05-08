@@ -41,10 +41,14 @@ class WorkflowTemplateSerializer(serializers.ModelSerializer):
 class WorkflowFieldResponseSerializer(serializers.ModelSerializer):
     field_label = serializers.CharField(source='field.label', read_only=True)
     field_type = serializers.CharField(source='field.field_type', read_only=True)
+    has_file = serializers.SerializerMethodField()
     
     class Meta:
         model = WorkflowFieldResponse
-        fields = ['id', 'field', 'field_label', 'field_type', 'value']
+        fields = ['id', 'field', 'field_label', 'field_type', 'value', 'has_file', 'filename', 'file_size']
+
+    def get_has_file(self, obj):
+        return bool(obj.file)
 
 
 class WorkflowStageInstanceSerializer(serializers.ModelSerializer):

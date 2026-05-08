@@ -110,6 +110,12 @@ export const applyOnIdea = (ideaId, data) =>
 export const fetchMyIdeaApplication = () =>
   api.get('/api/projects/applications/mine/');
 
+export const fetchMyWithdrawalRequests = () =>
+  api.get('/api/projects/withdrawals/mine/');
+
+export const requestProjectWithdrawal = (reason) =>
+  api.post('/api/projects/withdrawals/request/', { reason });
+
 // ── Projects: Doctor reviews applications ─────────────────────────────────────
 export const fetchDoctorPendingApplications = () =>
   api.get('/api/projects/applications/pending-doctor/');
@@ -143,6 +149,12 @@ export const fetchHodPendingApplications = () =>
 export const hodReviewApplication = (appId, data) =>
   api.post(`/api/projects/applications/${appId}/hod-review/`, data);
 
+export const fetchHodPendingWithdrawals = () =>
+  api.get('/api/projects/withdrawals/pending-hod/');
+
+export const hodReviewWithdrawal = (withdrawalId, data) =>
+  api.post(`/api/projects/withdrawals/${withdrawalId}/hod-review/`, data);
+
 // ── Team invitations ──────────────────────────────────────────────────────────
 export const fetchMyInvitations = () =>
   api.get('/api/projects/invitations/mine/');
@@ -173,17 +185,26 @@ export const searchStudents = (q) =>
 export default api;
 
 // ── Notifications ─────────────────────────────────────────────────────────────
-export const fetchNotifications = () =>
-  api.get('/api/notifications/');
+export const fetchNotifications = (params = {}) =>
+  api.get('/api/notifications/', { params });
 
 export const fetchUnreadCount = () =>
   api.get('/api/notifications/unread-count/');
+
+export const fetchNotificationSummary = () =>
+  api.get('/api/notifications/summary/');
 
 export const markNotifRead = (id) =>
   api.post(`/api/notifications/${id}/read/`);
 
 export const markAllNotifsRead = () =>
   api.post('/api/notifications/mark-all-read/');
+
+export const archiveNotification = (id) =>
+  api.post(`/api/notifications/${id}/archive/`);
+
+export const archiveReadNotifications = () =>
+  api.post('/api/notifications/archive-read/');
 
 // ── Dynamic Forms ─────────────────────────────────────────────────────────────
 export const fetchHodForm = (context) =>
@@ -245,6 +266,11 @@ export const uploadAttachment = (boardId, taskId, file) => {
 export const deleteAttachment = (boardId, taskId, attachmentId) =>
   api.delete(`/api/project-management/board/${boardId}/tasks/${taskId}/attachments/${attachmentId}/delete/`);
 
+export const openAttachment = (boardId, taskId, attachmentId) =>
+  api.get(`/api/project-management/board/${boardId}/tasks/${taskId}/attachments/${attachmentId}/open/`, {
+    responseType: 'blob',
+  });
+
 // ── Board Activity ─────────────────────────────────────────────────────────────
 export const fetchBoardActivity = (boardId) =>
   api.get(`/api/project-management/board/${boardId}/activity/`);
@@ -283,6 +309,11 @@ export const fetchPendingWorkflowStages = () =>
 
 export const submitWorkflowStage = (stageInstanceId, data) =>
   api.post(`/api/workflow/stage/${stageInstanceId}/submit/`, data);
+
+export const openWorkflowResponseFile = (stageInstanceId, responseId) =>
+  api.get(`/api/workflow/stage/${stageInstanceId}/responses/${responseId}/open/`, {
+    responseType: 'blob',
+  });
 
 export const reviewWorkflowStage = (stageInstanceId, data) =>
   api.post(`/api/workflow/stage/${stageInstanceId}/review/`, data);

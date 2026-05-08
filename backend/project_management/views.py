@@ -2,13 +2,16 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 import os
+import mimetypes
 
+from django.http import FileResponse
 from django.db.models import Count, Q
 from .models import ProjectBoard, Task, TaskComment, TaskAttachment, ActivityLog
 from .serializers import (
     ProjectBoardSerializer, TaskSerializer,
     TaskCommentSerializer, TaskAttachmentSerializer, ActivityLogSerializer,
 )
+from notifications.utils import notify, notify_many
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -21,10 +24,16 @@ ALLOWED_ATTACHMENT_EXTENSIONS = {'.pdf', '.doc', '.docx', '.xls', '.xlsx', '.png
 def _get_student_board(student):
     from projects.models import StudentIdeaProposal, IdeaApplication, ProposalInvitation, TeamInvitation
 
-    proposal = StudentIdeaProposal.objects.filter(student=student, status='assigned').first()
+    proposal = StudentIdeaProposal.objects.filter(student=student, status='assigned').exclude(
+        withdrawal_requests__student=student,
+        withdrawal_requests__status='approved',
+    ).first()
     if not proposal:
         inv = ProposalInvitation.objects.filter(
             invitee=student, status='accepted', proposal__status='assigned'
+        ).exclude(
+            proposal__withdrawal_requests__student=student,
+            proposal__withdrawal_requests__status='approved',
         ).select_related('proposal').first()
         if inv:
             proposal = inv.proposal
@@ -35,10 +44,16 @@ def _get_student_board(student):
         )
         return board
 
-    application = IdeaApplication.objects.filter(student=student, status='registered').first()
+    application = IdeaApplication.objects.filter(student=student, status='registered').exclude(
+        withdrawal_requests__student=student,
+        withdrawal_requests__status='approved',
+    ).first()
     if not application:
         inv = TeamInvitation.objects.filter(
             invitee=student, status='accepted', application__status='registered'
+        ).exclude(
+            application__withdrawal_requests__student=student,
+            application__withdrawal_requests__status='approved',
         ).select_related('application').first()
         if inv:
             application = inv.application
@@ -52,6 +67,14 @@ def _get_student_board(student):
     return None
 
 
+def _proposal_supervised_by(proposal, doctor):
+    if not proposal:
+        return False
+    if proposal.supervisor_assignments.filter(supervisor=doctor, status='accepted').exists():
+        return True
+    return bool(proposal.supervisor_id == doctor.id and not proposal.supervisor_assignments.exists())
+
+
 def _board_detail_queryset():
     return ProjectBoard.objects.select_related(
         'proposal__supervisor',
@@ -59,6 +82,7 @@ def _board_detail_queryset():
         'application__idea__doctor',
         'application__student',
     ).prefetch_related(
+        'proposal__supervisor_assignments__supervisor',
         'tasks__assignee',
         'tasks__created_by',
         'tasks__comments__author',
@@ -73,6 +97,8 @@ def _get_board_for_member(user, board_id):
             'proposal__student',
             'application__idea__doctor',
             'application__student',
+        ).prefetch_related(
+            'proposal__supervisor_assignments',
         ).get(pk=board_id)
     except ProjectBoard.DoesNotExist:
         return None
@@ -81,7 +107,7 @@ def _get_board_for_member(user, board_id):
         return board
 
     if user.role == 'doctor':
-        if board.proposal and board.proposal.supervisor_id == user.id:
+        if board.proposal and _proposal_supervised_by(board.proposal, user):
             return board
         if board.application and board.application.idea.doctor_id == user.id:
             return board
@@ -91,6 +117,33 @@ def _get_board_for_member(user, board_id):
 
 def _log(board, actor, verb, detail='', task=None):
     ActivityLog.objects.create(board=board, actor=actor, verb=verb, detail=detail, task=task)
+
+
+def _task_notification_metadata(board, task, extra=None):
+    metadata = {'board_id': board.id, 'board_title': board.title, 'task_id': task.id}
+    if extra:
+        metadata.update(extra)
+    return metadata
+
+
+def _notify_task_followers(task, actor, notif_type, title, message, *, priority=None, extra=None):
+    recipients = []
+    for user in [task.assignee, task.created_by]:
+        if user and user.pk != getattr(actor, 'pk', None) and user.pk not in [u.pk for u in recipients]:
+            recipients.append(user)
+    if recipients:
+        notify_many(
+            recipients,
+            notif_type,
+            title,
+            message,
+            actor=actor,
+            priority=priority,
+            action_label='Open task',
+            entity_type='task',
+            entity_id=task.id,
+            metadata=_task_notification_metadata(task.board, task, extra=extra),
+        )
 
 
 # ── Board ─────────────────────────────────────────────────────────────────────
@@ -116,7 +169,12 @@ def supervisor_boards(request):
     from projects.models import StudentIdeaProposal, IdeaApplication
     boards = []
 
-    for proposal in StudentIdeaProposal.objects.filter(supervisor=request.user, status='assigned')[:MAX_BOARD_LIST_SIZE]:
+    proposals = StudentIdeaProposal.objects.filter(status='assigned').filter(
+        Q(supervisor_assignments__supervisor=request.user, supervisor_assignments__status='accepted') |
+        Q(supervisor=request.user, supervisor_assignments__isnull=True)
+    ).distinct()
+
+    for proposal in proposals[:MAX_BOARD_LIST_SIZE]:
         board, _ = ProjectBoard.objects.get_or_create(
             proposal=proposal, defaults={'title': proposal.title}
         )
@@ -151,6 +209,30 @@ def create_task(request, board_id):
 
     task = serializer.save(board=board, created_by=request.user)
     _log(board, request.user, 'created', task.title, task=task)
+    if task.assignee and task.assignee_id != request.user.id:
+        notify(
+            task.assignee,
+            'task_assigned',
+            'New Task Assigned',
+            f'{request.user.get_full_name() or request.user.username} assigned you "{task.title}" on {board.title}.',
+            actor=request.user,
+            action_label='Open task',
+            entity_type='task',
+            entity_id=task.id,
+            metadata=_task_notification_metadata(board, task),
+        )
+    else:
+        notify_many(
+            board.members.exclude(pk=request.user.pk),
+            'task_created',
+            'New Project Task',
+            f'{request.user.get_full_name() or request.user.username} created "{task.title}" on {board.title}.',
+            actor=request.user,
+            action_label='Open board',
+            entity_type='task',
+            entity_id=task.id,
+            metadata=_task_notification_metadata(board, task),
+        )
     return Response(TaskSerializer(task).data, status=201)
 
 
@@ -187,8 +269,39 @@ def update_task(request, board_id, task_id):
         verb   = 'assigned' if task.assignee_id else 'unassigned'
         detail = task.assignee.get_full_name() or task.assignee.username if task.assignee else ''
         _log(board, request.user, verb, detail, task=task)
+        if task.assignee and task.assignee_id != request.user.id:
+            notify(
+                task.assignee,
+                'task_assigned',
+                'Task Assigned to You',
+                f'{request.user.get_full_name() or request.user.username} assigned you "{task.title}" on {board.title}.',
+                actor=request.user,
+                action_label='Open task',
+                entity_type='task',
+                entity_id=task.id,
+                metadata=_task_notification_metadata(board, task),
+            )
     if 'due_date' in request.data:
         _log(board, request.user, 'due_date_set', str(task.due_date or ''), task=task)
+    if 'status' in request.data and task.status != old_status:
+        if task.status == 'done':
+            _notify_task_followers(
+                task,
+                request.user,
+                'task_completed',
+                'Task Completed',
+                f'"{task.title}" was marked done on {board.title}.',
+                extra={'old_status': old_status, 'new_status': task.status},
+            )
+        else:
+            _notify_task_followers(
+                task,
+                request.user,
+                'task_updated',
+                'Task Status Updated',
+                f'"{task.title}" moved from {old_status} to {task.status}.',
+                extra={'old_status': old_status, 'new_status': task.status},
+            )
 
     return Response(TaskSerializer(task).data)
 
@@ -234,6 +347,14 @@ def task_comments(request, board_id, task_id):
 
     comment = serializer.save(task=task, author=request.user)
     _log(board, request.user, 'commented', comment.body[:100], task=task)
+    _notify_task_followers(
+        task,
+        request.user,
+        'task_comment_added',
+        'New Task Comment',
+        f'{request.user.get_full_name() or request.user.username} commented on "{task.title}".',
+        extra={'comment_id': comment.id},
+    )
     return Response(TaskCommentSerializer(comment).data, status=201)
 
 
@@ -289,9 +410,43 @@ def upload_attachment(request, board_id, task_id):
         file_size=file.size,
     )
     _log(board, request.user, 'attachment_added', file.name, task=task)
+    _notify_task_followers(
+        task,
+        request.user,
+        'task_attachment_added',
+        'Task Attachment Added',
+        f'{request.user.get_full_name() or request.user.username} attached {file.name} to "{task.title}".',
+        extra={'attachment_id': attachment.id, 'filename': file.name},
+    )
     return Response(
         TaskAttachmentSerializer(attachment, context={'request': request}).data,
         status=201,
+    )
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def open_attachment(request, board_id, task_id, attachment_id):
+    board = _get_board_for_member(request.user, board_id)
+    if not board:
+        return Response({'error': 'Not found or not a member.'}, status=404)
+
+    try:
+        attachment = TaskAttachment.objects.get(
+            pk=attachment_id, task__board=board, task_id=task_id
+        )
+    except TaskAttachment.DoesNotExist:
+        return Response({'error': 'Attachment not found.'}, status=404)
+
+    if not attachment.file:
+        return Response({'error': 'Attachment file is missing.'}, status=404)
+
+    content_type = mimetypes.guess_type(attachment.filename)[0] or 'application/octet-stream'
+    return FileResponse(
+        attachment.file.open('rb'),
+        as_attachment=False,
+        filename=attachment.filename,
+        content_type=content_type,
     )
 
 
@@ -349,13 +504,13 @@ def hod_boards(request):
     if request.user.role == 'hod':
         proposals = StudentIdeaProposal.objects.filter(
             department=department, status='assigned'
-        ).select_related('supervisor')
+        ).select_related('supervisor').prefetch_related('supervisor_assignments__supervisor')
         applications = IdeaApplication.objects.filter(
             idea__department=department, status='registered'
         ).select_related('idea__doctor')
     # Dean: all departments
     else:
-        proposals = StudentIdeaProposal.objects.filter(status='assigned').select_related('supervisor')
+        proposals = StudentIdeaProposal.objects.filter(status='assigned').select_related('supervisor').prefetch_related('supervisor_assignments__supervisor')
         applications = IdeaApplication.objects.filter(status='registered').select_related('idea__doctor')
 
     for proposal in proposals[:MAX_BOARD_LIST_SIZE]:

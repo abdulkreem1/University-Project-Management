@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { createTask, updateTask, deleteTask,
          postComment, deleteComment,
-         uploadAttachment, deleteAttachment,
+         uploadAttachment, openAttachment, deleteAttachment,
          fetchBoardActivity } from '../api';
 import './KanbanBoard.css';
 
@@ -190,6 +190,23 @@ function TaskDrawer({ task, board, onClose, onSave, onDelete, isSaving }) {
     setAttachments((a) => a.filter((x) => x.id !== aid));
   };
 
+  const handleOpenAttachment = async (attachment) => {
+    const popup = window.open('', '_blank');
+    try {
+      const res = await openAttachment(board.id, task.id, attachment.id);
+      const blobUrl = URL.createObjectURL(new Blob([res.data], { type: res.headers['content-type'] }));
+      if (popup) {
+        popup.location.href = blobUrl;
+      } else {
+        window.location.href = blobUrl;
+      }
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
+    } catch {
+      if (popup) popup.close();
+      alert('Could not open this file. Please try again.');
+    }
+  };
+
   return (
     <div className="kb-drawer-overlay" onClick={onClose} role="dialog" aria-modal="true">
       <aside className="kb-drawer" onClick={(e) => e.stopPropagation()}>
@@ -356,14 +373,14 @@ function TaskDrawer({ task, board, onClose, onSave, onDelete, isSaving }) {
                   <div key={a.id} className="kb-attachment">
                     <span className="kb-attachment-icon">{fileIcon(a.extension)}</span>
                     <div className="kb-attachment-info">
-                      <a href={a.file_url} target="_blank" rel="noopener noreferrer" className="kb-attachment-name">
+                      <button type="button" className="kb-attachment-name" onClick={() => handleOpenAttachment(a)}>
                         {a.filename}
-                      </a>
+                      </button>
                       <span className="kb-attachment-meta">
                         {fmtSize(a.file_size)} • {a.uploaded_by_name} • {fmtDate(a.created_at)}
                       </span>
                     </div>
-                    <button className="kb-icon-btn" onClick={() => window.open(a.file_url, '_blank')} title="Download">
+                    <button className="kb-icon-btn" onClick={() => handleOpenAttachment(a)} title="Open">
                       {Icon.Download}
                     </button>
                     <button className="kb-icon-btn kb-icon-btn--danger" onClick={() => handleDeleteAttachment(a.id)} title="Delete">

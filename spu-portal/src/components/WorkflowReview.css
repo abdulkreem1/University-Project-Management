@@ -304,6 +304,23 @@
   flex: 1;
 }
 
+.wr-file-link {
+  appearance: none;
+  background: none;
+  border: 0;
+  color: #4338ca;
+  cursor: pointer;
+  flex: 1;
+  font: inherit;
+  font-weight: 600;
+  padding: 0;
+  text-align: left;
+}
+
+.wr-file-link:hover {
+  text-decoration: underline;
+}
+
 .wr-feedback-section {
   margin-bottom: 20px;
 }

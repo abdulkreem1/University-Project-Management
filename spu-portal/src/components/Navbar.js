@@ -11,7 +11,7 @@ const ROLE_LABELS = {
 };
 
 export default function Navbar({ user, onLogout, currentPage }) {
-  const showBell = ['student', 'doctor', 'hod'].includes(user.role);
+  const showBell = ['student', 'doctor', 'hod', 'dean', 'admin'].includes(user.role);
 
   const getBreadcrumb = () => {
     const roleName = ROLE_LABELS[user.role] || user.role;

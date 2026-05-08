@@ -1,7 +1,9 @@
 from django.db import models
 from django.db.models import Q
 from django.conf import settings
+from django.utils.text import get_valid_filename
 from accounts.models import DEPARTMENTS
+import os
 
 # Workflow trigger types
 TRIGGER_TYPES = [
@@ -185,6 +187,12 @@ class WorkflowStageInstance(models.Model):
         return f"{self.stage.name} - Project {self.project_workflow.project_board_id}"
 
 
+def _workflow_response_upload_path(instance, filename):
+    safe_filename = get_valid_filename(os.path.basename(filename))
+    board_id = instance.stage_instance.project_workflow.project_board_id
+    return f'workflow_responses/{board_id}/{instance.stage_instance_id}/{instance.field_id}/{safe_filename}'
+
+
 class WorkflowFieldResponse(models.Model):
     """
     Student's response to a workflow stage field.
@@ -192,6 +200,9 @@ class WorkflowFieldResponse(models.Model):
     stage_instance = models.ForeignKey(WorkflowStageInstance, on_delete=models.CASCADE, related_name='field_responses')
     field = models.ForeignKey(WorkflowStageField, on_delete=models.CASCADE, related_name='responses')
     value = models.TextField(blank=True)
+    file = models.FileField(upload_to=_workflow_response_upload_path, null=True, blank=True)
+    filename = models.CharField(max_length=255, blank=True)
+    file_size = models.PositiveIntegerField(default=0)
     
     class Meta:
         unique_together = ('stage_instance', 'field')

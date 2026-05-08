@@ -15,6 +15,7 @@ from .services import (
     create_user_from_import, change_user_password, assign_hod,
     lookup_student_in_reference, register_verified_student,
 )
+from notifications.utils import notify, notify_many
 
 
 ALLOWED_IMPORT_EXTENSIONS = ('.xlsx', '.xlsm', '.xltx', '.xltm')
@@ -48,6 +49,13 @@ def change_password(request):
     result = change_user_password(user=request.user, new_password=new_password)
     if not result['ok']:
         return Response({'error': result['error']}, status=400)
+    notify(
+        request.user,
+        'password_changed',
+        'Password Changed',
+        'Your account password was changed successfully.',
+        actor=request.user,
+    )
     return Response({'message': 'Password changed successfully.'})
 
 
@@ -78,6 +86,7 @@ def import_users(request):
         return Response({'error': f'File has too many rows. Maximum allowed rows is {MAX_IMPORT_ROWS}.'}, status=400)
 
     created_users = []
+    created_user_objs = []
     for row in ws.iter_rows(min_row=2, values_only=True):
         if not row:
             continue
@@ -95,6 +104,23 @@ def import_users(request):
                 user.first_name = str(full_name)
                 user.save(update_fields=['first_name'])
             created_users.append({'username': username})
+            created_user_objs.append(user)
+    notify_many(
+        created_user_objs,
+        'account_imported',
+        'Portal Account Created',
+        'Your university project portal account has been created. Please sign in and change your password.',
+        actor=request.user,
+        priority='high',
+    )
+    notify(
+        request.user,
+        'account_imported',
+        'User Import Completed',
+        f'{len(created_users)} {role}s were created successfully.',
+        actor=request.user,
+        metadata={'role': role, 'created_count': len(created_users)},
+    )
     return Response({'message': f'{len(created_users)} {role}s created successfully.', 'users': created_users})
 
 
@@ -132,6 +158,24 @@ def assign_hod_view(request):
     if not result['ok']:
         return Response({'error': result['error']}, status=400)
     u = result['user']
+    notify(
+        u,
+        'hod_assigned',
+        'Head of Department Assignment',
+        f'You have been assigned as Head of Department for {department.replace("_", " ")}.',
+        actor=request.user,
+        priority='high',
+        metadata={'department': department},
+    )
+    if u.pk != request.user.pk:
+        notify(
+            request.user,
+            'hod_assigned',
+            'HoD Assignment Completed',
+            f'{u.get_full_name() or u.username} was assigned as Head of Department for {department.replace("_", " ")}.',
+            actor=request.user,
+            metadata={'department': department, 'doctor_id': u.id},
+        )
     return Response({'message': f'{u.first_name or u.username} assigned as HoD of {department}.', 'user': {
         'id': u.id, 'username': u.username,
         'full_name': f"{u.first_name} {u.last_name}".strip() or u.username,
@@ -169,6 +213,12 @@ def student_self_register(request):
             return Response({'error': result['error']}, status=409)
     else:
         user = result['user']
+        notify(
+            user,
+            'account_created',
+            'Welcome to SPU Portal',
+            'Your student account has been created successfully.',
+        )
 
     # Step 3: issue JWT
     refresh = RefreshToken.for_user(user)

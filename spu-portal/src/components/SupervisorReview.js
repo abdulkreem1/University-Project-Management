@@ -101,6 +101,33 @@ export default function SupervisorReview({ onBack }) {
               </div>
               <p className="sv-card-desc">{p.description}</p>
 
+              <div className="sv-team-row">
+                <span className="sv-team-label">Team Size:</span>
+                <span className="meta-tag">{p.team_size} student{p.team_size > 1 ? 's' : ''}</span>
+              </div>
+
+              {p.supervisors && p.supervisors.length > 0 && (
+                <div className="sv-team-row">
+                  <span className="sv-team-label">Requested Supervisors:</span>
+                  {p.supervisors.map((sup) => (
+                    <span key={sup.supervisor} className={`sv-team-member sv-team-member--${sup.status}`}>
+                      {sup.name} ({sup.status})
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              {(p.team_size === 1 || p.team_size === 4) && p.team_size_reason && (
+                <div className="sv-form-section">
+                  <div className="sv-form-responses">
+                    <div className="sv-form-field">
+                      <span className="sv-form-field-label">Team-size justification</span>
+                      <span className="sv-form-field-value">{p.team_size_reason}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Team info */}
               {p.invitations && p.invitations.length > 0 && (
                 <div className="sv-team-row">
@@ -175,7 +202,7 @@ export default function SupervisorReview({ onBack }) {
 
             {reviewing.action === 'approve' && (
               <p className="sv-modal-note">
-                This will forward the proposal to the HoD for final review.
+                If other requested supervisors are still pending, the proposal will wait for them. Rejected supervisors will not receive project supervision authority.
               </p>
             )}
 

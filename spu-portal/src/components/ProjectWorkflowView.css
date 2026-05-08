@@ -345,6 +345,31 @@
   resize: vertical;
 }
 
+.pwv-file-link {
+  appearance: none;
+  background: #eef2ff;
+  border: 1px solid #c7d2fe;
+  border-radius: 8px;
+  color: #4338ca;
+  cursor: pointer;
+  display: inline-block;
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 8px;
+  padding: 8px 10px;
+  text-align: left;
+}
+
+.pwv-file-link:hover {
+  background: #e0e7ff;
+}
+
+.pwv-file-selected {
+  color: #475569;
+  font-size: 13px;
+  margin-bottom: 8px;
+}
+
 .pwv-form-radio-group,
 .pwv-form-checkbox-group {
   display: flex;

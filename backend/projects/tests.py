@@ -5,12 +5,20 @@ from django.db import IntegrityError
 from django.test import TestCase
 from rest_framework.test import APIClient
 
-from .models import IdeaApplication, ProjectIdea, TeamInvitation, StudentIdeaProposal, ProposalInvitation
+from project_management.models import ProjectBoard
+
+from .models import (
+    IdeaApplication, ProjectIdea, TeamInvitation, StudentIdeaProposal,
+    ProposalInvitation, ProjectWithdrawalRequest, ProposalSupervisor,
+)
 from .services import (
     apply_on_idea,
     create_student_proposal,
     hod_review_application,
+    hod_review_proposal,
     respond_to_invitation,
+    student_has_registered_project,
+    supervisor_review_proposal,
 )
 
 User = get_user_model()
@@ -155,9 +163,19 @@ class ProjectsPhaseOneIntegrityTests(TestCase):
 class ProjectsPhaseTwoAlignmentTests(TestCase):
     def setUp(self):
         self.doctor = User.objects.create_user(username='doctor_b', password='DoctorPass123', role='doctor')
+        self.doctor2 = User.objects.create_user(username='doctor_b2', password='DoctorPass123', role='doctor')
+        self.doctor3 = User.objects.create_user(username='doctor_b3', password='DoctorPass123', role='doctor')
+        self.hod = User.objects.create_user(
+            username='hod_b',
+            password='HodPass123',
+            role='hod',
+            department='software_engineering',
+        )
         self.non_doctor = User.objects.create_user(username='student_as_sup', password='StudentPass123', role='student')
         self.leader = User.objects.create_user(username='leader_1', password='StudentPass123', role='student')
         self.member = User.objects.create_user(username='member_1', password='StudentPass123', role='student')
+        self.member2 = User.objects.create_user(username='member_2', password='StudentPass123', role='student')
+        self.member3 = User.objects.create_user(username='member_3', password='StudentPass123', role='student')
 
     def test_student_proposal_team_size_accepts_supported_values_only(self):
         another_leader = User.objects.create_user(username='leader_2', password='StudentPass123', role='student')
@@ -174,18 +192,47 @@ class ProjectsPhaseTwoAlignmentTests(TestCase):
         )
         self.assertTrue(ok['ok'])
 
-        bad = create_student_proposal(
+        four_person = create_student_proposal(
             student=another_leader,
             supervisor=self.doctor,
             title='Proposal Four',
             description='desc',
             department='software_engineering',
             team_size=4,
-            team_size_reason='Need more',
-            member_ids=[self.member.username, 'missing', 'missing2'],
+            team_size_reason='Need a larger team because the project has hardware, mobile, and backend tracks.',
+            member_ids=[self.member.username, self.member2.username, self.member3.username],
         )
-        self.assertFalse(bad['ok'])
-        self.assertIn('Team size must be 2 or 3 students.', bad['error'])
+        self.assertTrue(four_person['ok'])
+        self.assertEqual(four_person['proposal'].status, 'awaiting_members')
+        self.assertEqual(four_person['proposal'].invitations.count(), 3)
+
+    def test_solo_proposal_requires_reason_and_goes_to_supervisor(self):
+        missing_reason = create_student_proposal(
+            student=self.leader,
+            supervisor=self.doctor,
+            title='Solo Proposal',
+            description='desc',
+            department='software_engineering',
+            team_size=1,
+            team_size_reason='',
+            member_ids=[],
+        )
+        self.assertFalse(missing_reason['ok'])
+        self.assertIn('justification is required', missing_reason['error'])
+
+        ok = create_student_proposal(
+            student=self.leader,
+            supervisor=self.doctor,
+            title='Solo Proposal',
+            description='desc',
+            department='software_engineering',
+            team_size=1,
+            team_size_reason='The scope is small and the student already has the required implementation skills.',
+            member_ids=[],
+        )
+        self.assertTrue(ok['ok'])
+        self.assertEqual(ok['proposal'].status, 'pending_supervisor')
+        self.assertEqual(ok['proposal'].invitations.count(), 0)
 
     def test_team_size_reason_is_preserved_when_submitted(self):
         proposal = create_student_proposal(
@@ -219,6 +266,138 @@ class ProjectsPhaseTwoAlignmentTests(TestCase):
 
         self.assertFalse(result['ok'])
         self.assertEqual(result['error'], 'Supervisor must be a doctor.')
+
+    @patch('projects.services.notify')
+    def test_leader_can_submit_new_proposal_after_own_rejection(self, _notify):
+        StudentIdeaProposal.objects.create(
+            student=self.leader,
+            supervisor=self.doctor,
+            title='Rejected Proposal',
+            description='desc',
+            department='software_engineering',
+            team_size=1,
+            team_size_reason='Small enough for one student.',
+            status='rejected',
+            rejection_reason='Needs clearer scope.',
+        )
+
+        result = create_student_proposal(
+            student=self.leader,
+            supervisor=self.doctor,
+            title='Replacement Proposal',
+            description='desc',
+            department='software_engineering',
+            team_size=1,
+            team_size_reason='This replacement scope is narrow enough for one student.',
+            member_ids=[],
+        )
+
+        self.assertTrue(result['ok'])
+        self.assertEqual(result['proposal'].status, 'pending_supervisor')
+
+    @patch('projects.services.notify')
+    def test_team_member_can_submit_new_proposal_after_team_rejection(self, _notify):
+        proposal = StudentIdeaProposal.objects.create(
+            student=self.leader,
+            supervisor=self.doctor,
+            title='Rejected Team Proposal',
+            description='desc',
+            department='software_engineering',
+            team_size=2,
+            status='pending_supervisor',
+        )
+        ProposalInvitation.objects.create(proposal=proposal, invitee=self.member, status='accepted')
+
+        rejection = supervisor_review_proposal(
+            proposal=proposal,
+            action='reject',
+            rejection_reason='Needs clearer scope.',
+        )
+        self.assertTrue(rejection['ok'])
+
+        result = create_student_proposal(
+            student=self.member,
+            supervisor=self.doctor,
+            title='Member Replacement Proposal',
+            description='desc',
+            department='software_engineering',
+            team_size=1,
+            team_size_reason='This is a small individual follow-up idea.',
+            member_ids=[],
+        )
+
+        self.assertTrue(result['ok'])
+        self.assertEqual(result['proposal'].student, self.member)
+
+    @patch('projects.services.notify')
+    @patch('projects.services.notify_many')
+    def test_proposal_waits_until_all_requested_supervisors_respond(self, _notify_many, _notify):
+        result = create_student_proposal(
+            student=self.leader,
+            supervisor=self.doctor,
+            supervisor_count=2,
+            supervisor_ids=[self.doctor.id, self.doctor2.id],
+            title='Multi Supervisor Proposal',
+            description='desc',
+            department='software_engineering',
+            team_size=1,
+            team_size_reason='The implementation is small, but needs two specialist supervisors.',
+            member_ids=[],
+        )
+        self.assertTrue(result['ok'])
+        proposal = result['proposal']
+        self.assertEqual(ProposalSupervisor.objects.filter(proposal=proposal).count(), 2)
+
+        first = supervisor_review_proposal(proposal=proposal, supervisor=self.doctor, action='approve')
+        proposal.refresh_from_db()
+        self.assertTrue(first['ok'])
+        self.assertEqual(proposal.status, 'pending_supervisor')
+
+        second = supervisor_review_proposal(proposal=proposal, supervisor=self.doctor2, action='approve')
+        proposal.refresh_from_db()
+        self.assertTrue(second['ok'])
+        self.assertEqual(proposal.status, 'pending_hod')
+
+    @patch('projects.services.notify')
+    @patch('projects.services.notify_many')
+    def test_declined_supervisor_is_not_assigned_but_accepted_supervisor_continues(self, _notify_many, _notify):
+        result = create_student_proposal(
+            student=self.leader,
+            supervisor=self.doctor,
+            supervisor_count=2,
+            supervisor_ids=[self.doctor.id, self.doctor2.id],
+            title='Partially Accepted Proposal',
+            description='desc',
+            department='software_engineering',
+            team_size=1,
+            team_size_reason='The implementation is small, but needs specialist oversight.',
+            member_ids=[],
+        )
+        self.assertTrue(result['ok'])
+        proposal = result['proposal']
+
+        self.assertTrue(supervisor_review_proposal(proposal=proposal, supervisor=self.doctor, action='approve')['ok'])
+        self.assertTrue(supervisor_review_proposal(
+            proposal=proposal,
+            supervisor=self.doctor2,
+            action='reject',
+            rejection_reason='Outside my availability.',
+        )['ok'])
+        proposal.refresh_from_db()
+        self.assertEqual(proposal.status, 'pending_hod')
+
+        self.assertTrue(hod_review_proposal(proposal=proposal, action='approve')['ok'])
+
+        client = APIClient()
+        client.force_authenticate(user=self.doctor)
+        accepted_response = client.get('/api/project-management/supervisor/boards/')
+        self.assertEqual(accepted_response.status_code, 200)
+        self.assertEqual(len(accepted_response.data), 1)
+
+        client.force_authenticate(user=self.doctor2)
+        rejected_response = client.get('/api/project-management/supervisor/boards/')
+        self.assertEqual(rejected_response.status_code, 200)
+        self.assertEqual(len(rejected_response.data), 0)
 
 
 class ProjectsPhaseThreeApiTests(TestCase):
@@ -296,3 +475,136 @@ class ProjectsPhaseThreeApiTests(TestCase):
 
         cancel_resp = self.client.post(f'/api/projects/proposals/{proposal.id}/cancel/', {}, format='json')
         self.assertEqual(cancel_resp.status_code, 200)
+
+
+class ProjectWithdrawalTests(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.doctor = User.objects.create_user(username='withdraw_doc', password='DoctorPass123', role='doctor')
+        self.hod = User.objects.create_user(
+            username='withdraw_hod',
+            password='HodPass123',
+            role='hod',
+            department='software_engineering',
+        )
+        self.student = User.objects.create_user(username='withdraw_student', password='StudentPass123', role='student')
+        self.member = User.objects.create_user(username='withdraw_member', password='StudentPass123', role='student')
+        self.idea = ProjectIdea.objects.create(
+            doctor=self.doctor,
+            title='Registered Idea',
+            description='desc',
+            department='software_engineering',
+            max_team_size=2,
+            status='approved',
+        )
+        self.next_idea = ProjectIdea.objects.create(
+            doctor=self.doctor,
+            title='Next Idea',
+            description='desc',
+            department='software_engineering',
+            max_team_size=2,
+            status='approved',
+        )
+
+    @patch('projects.services.notify')
+    def test_pending_withdrawal_does_not_unlock_student(self, _notify):
+        application = IdeaApplication.objects.create(
+            idea=self.idea,
+            student=self.student,
+            team_size=1,
+            status='registered',
+        )
+        ProjectWithdrawalRequest.objects.create(
+            student=self.student,
+            application=application,
+            reason='Need to leave this project.',
+            status='pending',
+        )
+
+        result = apply_on_idea(student=self.student, idea=self.next_idea, team_size=1, member_ids=[])
+
+        self.assertFalse(result['ok'])
+        self.assertIn('registered project', result['error'])
+        self.assertTrue(student_has_registered_project(self.student))
+
+    @patch('projects.services.notify')
+    def test_approved_withdrawal_unlocks_student(self, _notify):
+        application = IdeaApplication.objects.create(
+            idea=self.idea,
+            student=self.student,
+            team_size=1,
+            status='registered',
+        )
+        ProjectWithdrawalRequest.objects.create(
+            student=self.student,
+            application=application,
+            reason='Need to leave this project.',
+            status='approved',
+        )
+
+        result = apply_on_idea(student=self.student, idea=self.next_idea, team_size=1, member_ids=[])
+
+        self.assertTrue(result['ok'])
+        self.assertFalse(student_has_registered_project(self.student))
+        self.assertEqual(result['application'].status, 'pending_doctor')
+
+    def test_board_members_exclude_approved_withdrawal(self):
+        proposal = StudentIdeaProposal.objects.create(
+            student=self.student,
+            supervisor=self.doctor,
+            title='Assigned Proposal',
+            description='desc',
+            department='software_engineering',
+            team_size=2,
+            status='assigned',
+        )
+        ProposalInvitation.objects.create(proposal=proposal, invitee=self.member, status='accepted')
+        ProjectWithdrawalRequest.objects.create(
+            student=self.member,
+            proposal=proposal,
+            reason='Need to leave this project.',
+            status='approved',
+        )
+        board = ProjectBoard.objects.create(proposal=proposal, title=proposal.title)
+
+        usernames = set(board.members.values_list('username', flat=True))
+
+        self.assertIn(self.student.username, usernames)
+        self.assertNotIn(self.member.username, usernames)
+
+    @patch('projects.services.notify')
+    @patch('projects.services.notify_many')
+    def test_student_request_and_hod_approval_api(self, _notify_many, _notify):
+        application = IdeaApplication.objects.create(
+            idea=self.idea,
+            student=self.student,
+            team_size=1,
+            status='registered',
+        )
+
+        self.client.force_authenticate(user=self.student)
+        response = self.client.post(
+            '/api/projects/withdrawals/request/',
+            {'reason': 'I need to leave my current project before joining another.'},
+            format='json',
+        )
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.data['status'], 'pending')
+
+        withdrawal = ProjectWithdrawalRequest.objects.get(student=self.student, application=application)
+        self.client.force_authenticate(user=self.hod)
+
+        pending_response = self.client.get('/api/projects/withdrawals/pending-hod/')
+        self.assertEqual(pending_response.status_code, 200)
+        self.assertEqual(len(pending_response.data), 1)
+
+        review_response = self.client.post(
+            f'/api/projects/withdrawals/{withdrawal.id}/hod-review/',
+            {'action': 'approve'},
+            format='json',
+        )
+
+        self.assertEqual(review_response.status_code, 200)
+        withdrawal.refresh_from_db()
+        self.assertEqual(withdrawal.status, 'approved')
+        self.assertFalse(student_has_registered_project(self.student))

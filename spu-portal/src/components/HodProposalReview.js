@@ -103,7 +103,34 @@ export default function HodProposalReview({ onBack }) {
 
               <p className="sv-card-desc">{p.description}</p>
 
+              <div className="sv-team-row">
+                <span className="sv-team-label">Team Size:</span>
+                <span className="meta-tag">{p.team_size} student{p.team_size > 1 ? 's' : ''}</span>
+              </div>
+
+              {(p.team_size === 1 || p.team_size === 4) && p.team_size_reason && (
+                <div className="sv-form-section">
+                  <div className="sv-form-responses">
+                    <div className="sv-form-field">
+                      <span className="sv-form-field-label">Team-size justification</span>
+                      <span className="sv-form-field-value">{p.team_size_reason}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Team members */}
+              {p.supervisors && p.supervisors.length > 0 && (
+                <div className="sv-team-row">
+                  <span className="sv-team-label">Supervisors:</span>
+                  {p.supervisors.map((sup) => (
+                    <span key={sup.supervisor} className={`sv-team-member sv-team-member--${sup.status}`}>
+                      {sup.name} ({sup.status})
+                    </span>
+                  ))}
+                </div>
+              )}
+
               {p.invitations && p.invitations.length > 0 && (
                 <div className="sv-team-row">
                   <span className="sv-team-label">Team:</span>

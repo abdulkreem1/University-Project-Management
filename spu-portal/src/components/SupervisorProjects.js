@@ -90,6 +90,15 @@ export default function SupervisorProjects({ onBack }) {
                 </span>
               </div>
 
+              {board.supervisors && board.supervisors.length > 0 && (
+                <div className="sp-supervisors-row">
+                  <span className="sp-supervisor-label">Supervisors:</span>
+                  <span className="sp-member-names">
+                    {board.supervisors.map((s) => s.name || s.username).join(', ')}
+                  </span>
+                </div>
+              )}
+
               <div className="sp-col-stats">
                 {COLUMNS.map((col) => {
                   const count = board.tasks.filter((t) => t.status === col.key).length;

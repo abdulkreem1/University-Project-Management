@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { fetchProjectWorkflow, submitWorkflowStage } from '../api';
+import { fetchProjectWorkflow, submitWorkflowStage, openWorkflowResponseFile } from '../api';
 import './ProjectWorkflowView.css';
 
 const Icons = {
@@ -20,9 +20,10 @@ const STATUS_META = {
   overdue: { label: 'Overdue', icon: <Icons.AlertCircle />, cls: 'pwv-status-overdue' },
 };
 
-function WorkflowStageForm({ stageInstance, onSubmit, onCancel, submitting, error }) {
+function WorkflowStageForm({ stageInstance, onSubmit, onCancel, onOpenFile, submitting, error }) {
   const fields = stageInstance.stage_details.fields || [];
   const [formData, setFormData] = useState({});
+  const existingResponses = stageInstance.field_responses || [];
 
   // Initialize form data with existing responses
   useEffect(() => {
@@ -62,13 +63,16 @@ function WorkflowStageForm({ stageInstance, onSubmit, onCancel, submitting, erro
       }
     }
     
-    onSubmit(formData);
+    onSubmit(formData, fields);
   };
 
   return (
     <form onSubmit={handleSubmit} className="pwv-form">
       {fields.map(field => {
         const value = formData[field.id] || '';
+        const existingFile = existingResponses.find(
+          response => response.field === field.id && response.has_file
+        );
         
         return (
           <div key={field.id} className="pwv-form-field">
@@ -170,18 +174,28 @@ function WorkflowStageForm({ stageInstance, onSubmit, onCancel, submitting, erro
             )}
             
             {field.field_type === 'file' && (
-              <input
-                type="file"
-                className="pwv-form-file"
-                onChange={e => {
-                  const file = e.target.files[0];
-                  if (file) {
-                    handleFieldChange(field.id, file.name);
-                  }
-                }}
-                required={field.required}
-                accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.gif"
-              />
+              <>
+                {existingFile && !(value instanceof File) && (
+                  <button type="button" className="pwv-file-link" onClick={() => onOpenFile(stageInstance.id, existingFile)}>
+                    Open current file: {existingFile.filename || existingFile.value}
+                  </button>
+                )}
+                {value instanceof File && (
+                  <div className="pwv-file-selected">Selected: {value.name}</div>
+                )}
+                <input
+                  type="file"
+                  className="pwv-form-file"
+                  onChange={e => {
+                    const file = e.target.files[0];
+                    if (file) {
+                      handleFieldChange(field.id, file);
+                    }
+                  }}
+                  required={field.required && !existingFile}
+                  accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.gif,.txt"
+                />
+              </>
             )}
           </div>
         );
@@ -230,11 +244,42 @@ export default function ProjectWorkflowView({ projectBoardId }) {
     loadWorkflow();
   }, [loadWorkflow]);
 
-  const handleSubmitStage = async (formData) => {
+  const handleOpenWorkflowFile = async (stageInstanceId, response) => {
+    const popup = window.open('', '_blank');
+    try {
+      const res = await openWorkflowResponseFile(stageInstanceId, response.id);
+      const blobUrl = URL.createObjectURL(new Blob([res.data], { type: res.headers['content-type'] }));
+      if (popup) {
+        popup.location.href = blobUrl;
+      } else {
+        window.location.href = blobUrl;
+      }
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
+    } catch {
+      if (popup) popup.close();
+      alert('Could not open this workflow file. Please try again.');
+    }
+  };
+
+  const handleSubmitStage = async (formData, fields) => {
     setSubmitting(true);
     setError('');
     try {
-      await submitWorkflowStage(selectedStage.id, { field_responses: formData });
+      const payload = new FormData();
+      const responses = {};
+
+      fields.forEach((field) => {
+        const value = formData[field.id];
+        if (field.field_type === 'file' && value instanceof File) {
+          responses[field.id] = value.name;
+          payload.append(`file_${field.id}`, value);
+        } else {
+          responses[field.id] = value || '';
+        }
+      });
+
+      payload.append('field_responses', JSON.stringify(responses));
+      await submitWorkflowStage(selectedStage.id, payload);
       loadWorkflow();
       setSelectedStage(null);
     } catch {
@@ -279,6 +324,7 @@ export default function ProjectWorkflowView({ projectBoardId }) {
         <WorkflowStageForm
           stageInstance={selectedStage}
           onSubmit={handleSubmitStage}
+          onOpenFile={handleOpenWorkflowFile}
           onCancel={() => setSelectedStage(null)}
           submitting={submitting}
           error={error}

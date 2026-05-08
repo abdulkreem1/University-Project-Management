@@ -1,3 +1,5 @@
+from django.db.models import Q
+
 from .models import ProjectIdea, StudentIdeaProposal
 
 
@@ -23,27 +25,37 @@ def get_all_ideas():
 def get_student_proposal(student):
     """Return the student's latest active proposal, or the latest one of any status."""
     base = StudentIdeaProposal.objects.select_related('student', 'supervisor').prefetch_related(
-        'invitations', 'invitations__invitee'
+        'invitations', 'invitations__invitee',
+        'supervisor_assignments', 'supervisor_assignments__supervisor',
     )
 
     active = base.filter(
         student=student,
         status__in=['awaiting_members', 'pending_supervisor', 'pending_hod', 'assigned'],
+    ).exclude(
+        withdrawal_requests__student=student,
+        withdrawal_requests__status='approved',
     ).order_by('-created_at').first()
     if active:
         return active
     # Fall back to latest (rejected) so student can see history
-    return base.filter(student=student).order_by('-created_at').first()
+    return base.filter(student=student).exclude(
+        withdrawal_requests__student=student,
+        withdrawal_requests__status='approved',
+    ).order_by('-created_at').first()
 
 
 def get_pending_supervisor_proposals(supervisor):
     """Proposals waiting for this supervisor's approval."""
     return StudentIdeaProposal.objects.filter(
-        supervisor=supervisor,
         status='pending_supervisor',
+    ).filter(
+        Q(supervisor_assignments__supervisor=supervisor, supervisor_assignments__status='pending') |
+        Q(supervisor=supervisor, supervisor_assignments__isnull=True)
     ).select_related('student', 'supervisor').prefetch_related(
-        'invitations', 'invitations__invitee'
-    ).order_by('-created_at')
+        'invitations', 'invitations__invitee',
+        'supervisor_assignments', 'supervisor_assignments__supervisor',
+    ).distinct().order_by('-created_at')
 
 
 def get_pending_hod_proposals(department):
@@ -52,7 +64,8 @@ def get_pending_hod_proposals(department):
         department=department,
         status='pending_hod',
     ).select_related('student', 'supervisor').prefetch_related(
-        'invitations', 'invitations__invitee'
+        'invitations', 'invitations__invitee',
+        'supervisor_assignments', 'supervisor_assignments__supervisor',
     ).order_by('-created_at')
 
 
@@ -68,9 +81,14 @@ def get_pending_doctor_ideas_for_hod(department):
 def get_student_idea_application(student):
     """Return the student's active IdeaApplication or None."""
     from .models import IdeaApplication
-    return IdeaApplication.objects.filter(student=student).select_related(
+    base = IdeaApplication.objects.filter(student=student).select_related(
         'student', 'idea', 'idea__doctor'
-    ).prefetch_related('invitations', 'invitations__invitee').order_by('-created_at').first()
+    ).prefetch_related('invitations', 'invitations__invitee')
+
+    return base.exclude(
+        withdrawal_requests__student=student,
+        withdrawal_requests__status='approved',
+    ).order_by('-created_at').first()
 
 
 def get_pending_doctor_applications(doctor):
@@ -92,4 +110,21 @@ def get_pending_hod_applications(department):
         status='pending_hod',
     ).select_related('student', 'idea', 'idea__doctor').prefetch_related(
         'invitations', 'invitations__invitee'
+    ).order_by('-created_at')
+
+
+def get_student_withdrawal_requests(student):
+    from .models import ProjectWithdrawalRequest
+    return ProjectWithdrawalRequest.objects.filter(student=student).select_related(
+        'student', 'reviewed_by', 'proposal', 'application__idea'
+    ).order_by('-created_at')
+
+
+def get_pending_hod_withdrawal_requests(department):
+    from .models import ProjectWithdrawalRequest
+    return ProjectWithdrawalRequest.objects.filter(status='pending').filter(
+        Q(proposal__department=department) |
+        Q(application__idea__department=department)
+    ).select_related(
+        'student', 'reviewed_by', 'proposal', 'application__idea'
     ).order_by('-created_at')

@@ -11,11 +11,13 @@ from .selectors import (
     get_pending_supervisor_proposals, get_pending_hod_proposals,
     get_pending_doctor_ideas_for_hod,
     get_student_idea_application, get_pending_doctor_applications, get_pending_hod_applications,
+    get_student_withdrawal_requests, get_pending_hod_withdrawal_requests,
 )
 from .serializers import (
     ProjectIdeaSerializer, StudentIdeaProposalSerializer,
     ProposalReviewSerializer, IdeaApplicationSerializer,
     TeamInvitationSerializer, ProposalInvitationSerializer,
+    ProjectWithdrawalCreateSerializer, ProjectWithdrawalRequestSerializer,
 )
 from .services import (
     create_project_idea, create_student_proposal, cancel_proposal,
@@ -24,8 +26,12 @@ from .services import (
     apply_on_idea, doctor_review_application, hod_review_application,
     respond_to_invitation, respond_to_proposal_invitation,
     replace_proposal_member, replace_application_member,
+    create_project_withdrawal_request, hod_review_withdrawal_request,
 )
-from .models import StudentIdeaProposal, ProjectIdea, IdeaApplication, TeamInvitation, ProposalInvitation
+from .models import (
+    StudentIdeaProposal, ProjectIdea, IdeaApplication, TeamInvitation,
+    ProposalInvitation, ProjectWithdrawalRequest,
+)
 
 
 MAX_STUDENT_SEARCH_RESULTS = 20
@@ -85,6 +91,8 @@ def propose_idea(request):
         return _validation_error_response(serializer.errors)
 
     team_size        = int(request.data.get('team_size', 1))
+    supervisor_count = int(request.data.get('supervisor_count', 1))
+    supervisor_ids   = request.data.get('supervisor_ids', [])
     team_size_reason = request.data.get('team_size_reason', '').strip()
     member_ids       = request.data.get('member_ids', [])
     form_id          = request.data.get('form_id')
@@ -93,13 +101,15 @@ def propose_idea(request):
     with transaction.atomic():
         result = create_student_proposal(
             student=request.user,
-            supervisor=serializer.validated_data['supervisor'],
+            supervisor=serializer.validated_data.get('supervisor'),
             title=serializer.validated_data['title'],
             description=serializer.validated_data['description'],
             department=serializer.validated_data['department'],
             team_size=team_size,
             team_size_reason=team_size_reason,
             member_ids=member_ids,
+            supervisor_count=supervisor_count,
+            supervisor_ids=supervisor_ids,
         )
         if not result['ok']:
             return Response({'error': result['error']}, status=400)
@@ -193,7 +203,7 @@ def supervisor_pending_proposals(request):
 @permission_classes([IsAuthenticated, IsDoctor])
 def supervisor_review(request, proposal_id):
     try:
-        proposal = StudentIdeaProposal.objects.get(pk=proposal_id, supervisor=request.user)
+        proposal = StudentIdeaProposal.objects.get(pk=proposal_id)
     except StudentIdeaProposal.DoesNotExist:
         return Response({'error': 'Proposal not found.'}, status=404)
 
@@ -205,6 +215,7 @@ def supervisor_review(request, proposal_id):
         proposal=proposal,
         action=serializer.validated_data['action'],
         rejection_reason=serializer.validated_data.get('rejection_reason', ''),
+        supervisor=request.user,
     )
     if not result['ok']:
         return Response({'error': result['error']}, status=400)
@@ -318,6 +329,60 @@ def my_idea_application(request):
     if not app:
         return Response(None)
     return Response(IdeaApplicationSerializer(app).data)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated, IsStudent])
+def my_withdrawal_requests(request):
+    withdrawals = get_student_withdrawal_requests(request.user)[:MAX_LIST_RESPONSE_SIZE]
+    return Response(ProjectWithdrawalRequestSerializer(withdrawals, many=True).data)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated, IsStudent])
+def request_project_withdrawal(request):
+    serializer = ProjectWithdrawalCreateSerializer(data=request.data)
+    if not serializer.is_valid():
+        return _validation_error_response(serializer.errors)
+
+    result = create_project_withdrawal_request(
+        student=request.user,
+        reason=serializer.validated_data['reason'],
+    )
+    if not result['ok']:
+        return Response({'error': result['error']}, status=400)
+    return Response(ProjectWithdrawalRequestSerializer(result['withdrawal']).data, status=201)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated, IsHod])
+def hod_pending_withdrawal_requests(request):
+    withdrawals = get_pending_hod_withdrawal_requests(request.user.department)[:MAX_LIST_RESPONSE_SIZE]
+    return Response(ProjectWithdrawalRequestSerializer(withdrawals, many=True).data)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated, IsHod])
+def hod_review_withdrawal(request, withdrawal_id):
+    try:
+        withdrawal = ProjectWithdrawalRequest.objects.get(pk=withdrawal_id)
+    except ProjectWithdrawalRequest.DoesNotExist:
+        return Response({'error': 'Withdrawal request not found.'}, status=404)
+
+    serializer = ProposalReviewSerializer(data=request.data)
+    if not serializer.is_valid():
+        return _validation_error_response(serializer.errors)
+
+    result = hod_review_withdrawal_request(
+        withdrawal=withdrawal,
+        hod=request.user,
+        action=serializer.validated_data['action'],
+        rejection_reason=serializer.validated_data.get('rejection_reason', ''),
+    )
+    if not result['ok']:
+        status = 404 if 'not found' in result['error'].lower() else 400
+        return Response({'error': result['error']}, status=status)
+    return Response(ProjectWithdrawalRequestSerializer(result['withdrawal']).data)
 
 
 # ── Doctor reviews applications on their ideas ────────────────────────────────

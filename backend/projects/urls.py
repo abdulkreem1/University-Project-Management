@@ -7,6 +7,8 @@ from .views import (
     hod_pending_proposals, hod_review,
     hod_pending_doctor_ideas, hod_review_idea,
     browse_ideas, apply_idea, my_idea_application,
+    my_withdrawal_requests, request_project_withdrawal,
+    hod_pending_withdrawal_requests, hod_review_withdrawal,
     doctor_pending_applications, doctor_review_app,
     hod_pending_applications, hod_review_app,
     my_invitations, respond_invitation,
@@ -42,6 +44,8 @@ urlpatterns = [
     path('api/projects/ideas/browse/',                       browse_ideas,                 name='browse_ideas'),
     path('api/projects/ideas/<int:idea_id>/apply/',          apply_idea,                   name='apply_idea'),
     path('api/projects/applications/mine/',                  my_idea_application,          name='my_idea_application'),
+    path('api/projects/withdrawals/mine/',                   my_withdrawal_requests,       name='my_withdrawal_requests'),
+    path('api/projects/withdrawals/request/',                request_project_withdrawal,   name='request_project_withdrawal'),
 
     # UC-03 — Doctor reviews applications
     path('api/projects/applications/pending-doctor/',        doctor_pending_applications,  name='doctor_pending_apps'),
@@ -50,6 +54,10 @@ urlpatterns = [
     # UC-03 — HoD reviews applications
     path('api/projects/applications/pending-hod/',           hod_pending_applications,     name='hod_pending_apps'),
     path('api/projects/applications/<int:app_id>/hod-review/', hod_review_app,             name='hod_review_app'),
+
+    # HoD — project withdrawal requests
+    path('api/projects/withdrawals/pending-hod/',            hod_pending_withdrawal_requests, name='hod_pending_withdrawals'),
+    path('api/projects/withdrawals/<int:withdrawal_id>/hod-review/', hod_review_withdrawal, name='hod_review_withdrawal'),
 
     # Team invitations (doctor idea applications)
     path('api/projects/invitations/mine/',                   my_invitations,               name='my_invitations'),

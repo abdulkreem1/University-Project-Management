@@ -89,13 +89,34 @@ class TaskSerializer(serializers.ModelSerializer):
 class ProjectBoardSerializer(serializers.ModelSerializer):
     tasks   = TaskSerializer(many=True, read_only=True)
     members = serializers.SerializerMethodField()
+    supervisors = serializers.SerializerMethodField()
 
     class Meta:
         model  = ProjectBoard
-        fields = ['id', 'title', 'created_at', 'tasks', 'members']
+        fields = ['id', 'title', 'created_at', 'tasks', 'members', 'supervisors']
 
     def get_members(self, obj):
         return [
             {'id': m.id, 'username': m.username, 'name': m.get_full_name() or m.username}
             for m in obj.members
         ]
+
+    def get_supervisors(self, obj):
+        if obj.proposal:
+            assignments = list(obj.proposal.supervisor_assignments.filter(status='accepted').select_related('supervisor'))
+            if assignments:
+                return [
+                    {
+                        'id': assignment.supervisor_id,
+                        'username': assignment.supervisor.username,
+                        'name': assignment.supervisor.get_full_name() or assignment.supervisor.username,
+                    }
+                    for assignment in assignments
+                ]
+            if obj.proposal.supervisor:
+                sup = obj.proposal.supervisor
+                return [{'id': sup.id, 'username': sup.username, 'name': sup.get_full_name() or sup.username}]
+        if obj.application and obj.application.idea.doctor:
+            doctor = obj.application.idea.doctor
+            return [{'id': doctor.id, 'username': doctor.username, 'name': doctor.get_full_name() or doctor.username}]
+        return []
